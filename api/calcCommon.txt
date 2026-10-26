@@ -1,0 +1,99 @@
+﻿function calculateCommonIncome($data, $MEDIAN_INCOME, $isChasangwi = false, $forMedical = false) {
+    $householdSize = $data['householdSize'] ?? '1';
+    $medianIncome = $MEDIAN_INCOME[$householdSize] ?? 0;
+    
+    // 1-1. 洹쇰줈/?ъ뾽?뚮뱷
+    $evaluatedEarnedIncome = 0;
+    foreach ($data['earnedIncomes'] as $income) {
+        $grossIncome = floatval($income['amount']) * getMultiplier($income['amountUnit']);
+        $pensionPaid = floatval($income['pension']) * getMultiplier($income['pensionUnit']);
+        if ($grossIncome <= 0) continue;
+        
+        $baseDeduction = 0;
+        $percentageRate = 0.3;
+        
+        switch ($income['type']) {
+            case 'youth': $baseDeduction = 600000; break;
+            case 'student': $baseDeduction = 600000; break;
+            case 'senior': 
+            case 'student_over_35':
+            case 'disabled': $baseDeduction = 200000; break;
+            case 'single_parent_youth': $baseDeduction = 600000; break;
+            case 'disabled_rehab': $baseDeduction = 200000; $percentageRate = 0.5; break;
+            default: 
+                $baseDeduction = 0; 
+                $percentageRate = $forMedical ? 0.0 : 0.3; 
+                break;
+        }
+
+        $remainingIncome = max(0, $grossIncome - $baseDeduction);
+        $percentageDeduction = $remainingIncome * $percentageRate;
+        $incomeDeduction = $baseDeduction + $percentageDeduction;
+        
+        $cappedIncomeDeduction = min($grossIncome, $incomeDeduction);
+        $incomeAfterEarnedDeduction = $grossIncome - $cappedIncomeDeduction;
+        $pensionDeductionApplied = $pensionPaid * 0.75;
+        
+        $evaluatedEarnedIncome += max(0, $incomeAfterEarnedDeduction - $pensionDeductionApplied);
+    }
+    
+    // 1-2. ?ъ쟻 ?댁쟾?뚮뱷 (李⑥긽?꾧퀎痢듯솗??蹂몄씤遺?닿꼍媛??먯꽌??諛섏쁺 ?덊븿)
+    $evaluatedPrivateTransferIncome = 0;
+    if (!$isChasangwi) {
+        $privateType = $data['privateTransferType'] ?? 'same';
+        if ($privateType === 'same') {
+            $monthlyInput = floatval($data['privateTransferIncome']) * getMultiplier($data['inputUnits']['privateTransferIncome']);
+            $deductionVal = $medianIncome * 0.15;
+            $evaluatedPrivateTransferIncome = max(0, $monthlyInput - $deductionVal);
+        } else {
+            $calculatedSum = 0;
+            $validCount = 0;
+            $monthlyInputs = [];
+            for($i=0; $i<12; $i++) {
+                $val = floatval($data['privateTransferTwelveMonths'][$i] ?? 0);
+                $unit = $data['privateTransferTwelveMonthUnits'][$i] ?? 'manwon';
+                $input = $val * getMultiplier($unit);
+                if ($input > 0) $validCount++;
+                $calculated = max(0, $input - ($medianIncome * 0.15));
+                $calculatedSum += $calculated;
+            }
+            $isFrequent = $data['isFrequentPrivateTransfer'] || $validCount >= 6;
+            if ($isFrequent) {
+                $evaluatedPrivateTransferIncome = $calculatedSum / 12; // ?뺢린
+            } else {
+                $threshold = $medianIncome * 0.5; // 鍮꾩젙湲?                if ($calculatedSum > $threshold) {
+                    $evaluatedPrivateTransferIncome = ($calculatedSum - $threshold) / 12;
+                } else {
+                    $evaluatedPrivateTransferIncome = 0;
+                }
+            }
+        }
+    }
+    
+    // 1-3. 怨듭쟻 ?댁쟾?뚮뱷
+    $evaluatedPublicTransferIncome = floatval($data['publicTransferIncome']) * getMultiplier($data['inputUnits']['publicTransferIncome']);
+    
+    // 1-4. ?ъ궛?뚮뱷 (?꾨??뚮뱷, ?댁옄?뚮뱷)
+    $propertyRentalIncome = floatval($data['propertyRentalIncome'] ?? 0) * getMultiplier($data['inputUnits']['propertyRentalIncome'] ?? 'manwon');
+    
+    $propertyInterestInput = floatval($data['propertyInterestIncome'] ?? 0) * getMultiplier($data['inputUnits']['propertyInterestIncome'] ?? 'manwon');
+    $interestMonths = intval($data['propertyInterestMonths'] ?? 12);
+    
+    if ($interestMonths <= 12) {
+        $interestDeduction = 240000;
+    } else {
+        $interestDeduction = 20000 * $interestMonths;
+    }
+    $evaluatedInterestIncome = max(0, ($propertyInterestInput - $interestDeduction) / 12);
+    
+    $evaluatedPropertyIncome = $propertyRentalIncome + $evaluatedInterestIncome;
+    
+    // 1-5. 吏異쒖슂??怨듭젣
+    $expenditureDeduction = floatval($data['expenditureDeduction'] ?? 0) * getMultiplier($data['inputUnits']['expenditureDeduction'] ?? 'manwon');
+    
+    $totalIncome = $evaluatedEarnedIncome + $evaluatedPrivateTransferIncome + $evaluatedPublicTransferIncome + $evaluatedPropertyIncome - $expenditureDeduction;
+    
+    return max(0, $totalIncome);
+}
+
+

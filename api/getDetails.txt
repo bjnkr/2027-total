@@ -1,0 +1,267 @@
+﻿function getCalculationDetails($data, $MEDIAN_INCOME, $basicDeductionAmount, $isChasangwi, $financialPropertyRateValue = 0.0626, $forMedical = false) {
+    global $RESIDENTIAL_PROPERTY_LIMITS, $FINANCIAL_ASSET_DEDUCTION, $WORK_UNABLE_PROPERTY_LIMITS, $WORK_UNABLE_FINANCIAL_LIMITS;
+    $householdSize = $data['householdSize'] ?? '1';
+    $medianIncome = $MEDIAN_INCOME[$householdSize] ?? 0;
+    
+    // ?뚮뱷
+    $totalEarnedRaw = 0;
+    $incomeDetails = [];
+    $evaluatedEarnedIncome = 0;
+    foreach ($data['earnedIncomes'] as $income) {
+        $grossIncome = floatval($income['amount']) * getMultiplier($income['amountUnit']);
+        $pensionPaid = floatval($income['pension']) * getMultiplier($income['pensionUnit']);
+        if ($grossIncome <= 0) continue;
+        
+        $totalEarnedRaw += $grossIncome;
+        $baseDeduction = 0;
+        $percentageRate = 0.3;
+        $deductionLabel = "湲곕낯 怨듭젣 (30%)";
+        
+        switch ($income['type']) {
+            case 'youth': $baseDeduction = 600000; $deductionLabel = "泥?뀈 怨듭젣 (60留?+ 30%)"; break;
+            case 'student': $baseDeduction = 600000; $deductionLabel = "??숈깮 怨듭젣 (60留?+ 30%)"; break;
+            case 'senior': $baseDeduction = 200000; $deductionLabel = "?몄씤 怨듭젣 (20留?+ 30%)"; break;
+            case 'disabled': $baseDeduction = 200000; $deductionLabel = "?μ븷??怨듭젣 (20留?+ 30%)"; break;
+            case 'single_parent_youth': $baseDeduction = 600000; $deductionLabel = "?쒕?紐?泥?뀈 怨듭젣 (60留?+ 30%)"; break;
+            case 'disabled_rehab': $baseDeduction = 200000; $percentageRate = 0.5; $deductionLabel = "?μ븷??吏곸뾽?ы솢 (20留?+ 50%)"; break;
+            default:
+                if ($forMedical) {
+                    $percentageRate = 0.0;
+                    $deductionLabel = "怨듭젣 ?놁쓬";
+                }
+                break;
+        }
+
+        $remainingIncome = max(0, $grossIncome - $baseDeduction);
+        $percentageDeduction = $remainingIncome * $percentageRate;
+        $incomeDeduction = $baseDeduction + $percentageDeduction;
+        $cappedIncomeDeduction = min($grossIncome, $incomeDeduction);
+        $pensionDeductionApplied = $pensionPaid * 0.75;
+        
+        $eval = max(0, ($grossIncome - $cappedIncomeDeduction) - $pensionDeductionApplied);
+        $evaluatedEarnedIncome += $eval;
+        
+        $incomeDetails[] = [
+            'raw' => $grossIncome,
+            'deductionLabel' => $deductionLabel,
+            'deduction' => $cappedIncomeDeduction,
+            'pensionDeduction' => $pensionDeductionApplied
+        ];
+    }
+    
+    // ?ъ쟻?댁쟾?뚮뱷 (李⑥긽?꾨뒗 0 泥섎━)
+    $privateTransferTotalInput = 0;
+    $evaluatedPrivateTransferIncome = 0;
+    if (!$isChasangwi) {
+        $privateType = $data['privateTransferType'] ?? 'same';
+        if ($privateType === 'same') {
+            $monthlyInput = floatval($data['privateTransferIncome']) * getMultiplier($data['inputUnits']['privateTransferIncome']);
+            $privateTransferTotalInput = $monthlyInput;
+            $deductionVal = $medianIncome * 0.15;
+            $evaluatedPrivateTransferIncome = max(0, $monthlyInput - $deductionVal);
+        } else {
+            $calculatedSum = 0;
+            $validCount = 0;
+            for($i=0; $i<12; $i++) {
+                $val = floatval($data['privateTransferTwelveMonths'][$i] ?? 0);
+                $unit = $data['privateTransferTwelveMonthUnits'][$i] ?? 'manwon';
+                $input = $val * getMultiplier($unit);
+                if ($input > 0) $validCount++;
+                $privateTransferTotalInput += $input;
+                $calculated = max(0, $input - ($medianIncome * 0.15));
+                $calculatedSum += $calculated;
+            }
+            $privateTransferTotalInput = $privateTransferTotalInput / 12; // ?됯퇏媛?            $isFrequent = $data['isFrequentPrivateTransfer'] || $validCount >= 6;
+            if ($isFrequent) {
+                $evaluatedPrivateTransferIncome = $calculatedSum / 12;
+            } else {
+                $threshold = $medianIncome * 0.5;
+                if ($calculatedSum > $threshold) {
+                    $evaluatedPrivateTransferIncome = ($calculatedSum - $threshold) / 12;
+                } else {
+                    $evaluatedPrivateTransferIncome = 0;
+                }
+            }
+        }
+    }
+    
+    // ?댁쟾?뚮뱷 諛?怨듭쟻 ?댁쟾?뚮뱷
+    $evaluatedPublicTransferIncome = floatval($data['publicTransferIncome']) * getMultiplier($data['inputUnits']['publicTransferIncome']);
+    
+    // ?ъ궛?뚮뱷 (?꾨??뚮뱷, ?댁옄?뚮뱷)
+    $propertyRentalIncome = floatval($data['propertyRentalIncome'] ?? 0) * getMultiplier($data['inputUnits']['propertyRentalIncome'] ?? 'manwon');
+    
+    $propertyInterestInput = floatval($data['propertyInterestIncome'] ?? 0) * getMultiplier($data['inputUnits']['propertyInterestIncome'] ?? 'manwon');
+    $interestMonths = intval($data['propertyInterestMonths'] ?? 12);
+    
+    if ($interestMonths <= 12) {
+        $interestDeduction = 240000;
+    } else {
+        $interestDeduction = 20000 * $interestMonths;
+    }
+    $evaluatedInterestIncome = max(0, ($propertyInterestInput - $interestDeduction) / 12);
+    
+    // 吏異쒖슂??怨듭젣
+    $expenditureDeductionRaw = floatval($data['expenditureDeduction'] ?? 0) * getMultiplier($data['inputUnits']['expenditureDeduction'] ?? 'manwon');
+    
+    $totalIncomeEvaluationBeforeDeduction = $evaluatedEarnedIncome + $evaluatedPrivateTransferIncome + $evaluatedPublicTransferIncome + $propertyRentalIncome + $evaluatedInterestIncome;
+    $totalIncomeEvaluation = max(0, $totalIncomeEvaluationBeforeDeduction - $expenditureDeductionRaw);
+    
+    // ?ъ궛
+    $region = $data['region'] ?? 'seoul';
+    $housingType = $data['housingType'] ?? 'jeonse';
+    $residentialRaw = floatval($data['residentialProperty']) * getMultiplier($data['inputUnits']['residentialProperty']);
+    $residentialPropertyRate = ($housingType === 'jeonse') ? 0.95 : 1.0;
+    $adjustedResidential = $residentialRaw * $residentialPropertyRate;
+    
+    $generalRaw = floatval($data['generalProperty']) * getMultiplier($data['inputUnits']['generalProperty']);
+    $automobileRaw = floatval($data['automobileProperty']) * getMultiplier($data['inputUnits']['automobileProperty']);
+    $financialRaw = floatval($data['financialProperty']) * getMultiplier($data['inputUnits']['financialProperty']);
+    $debtRaw = floatval($data['debt']) * getMultiplier($data['inputUnits']['debt']);
+    
+    $displacement = intval($data['automobileDisplacement']);
+    if ($data['automobileDisabilityType'] === 'severe' && $displacement < 2000) {
+        $automobileRaw = 0;
+    }
+    
+    $residentialLimit = $RESIDENTIAL_PROPERTY_LIMITS[$region] ?? $RESIDENTIAL_PROPERTY_LIMITS['seoul'];
+    $residentialForCalculation = min($adjustedResidential, $residentialLimit);
+    $residentialExcess = max(0, $adjustedResidential - $residentialLimit);
+    $totalGeneralProperty = $generalRaw + $automobileRaw + $residentialExcess;
+    
+    $remainingBasicDeduction = $basicDeductionAmount;
+    $remainingDebt = $debtRaw;
+    
+    $residentialDeduction = min($residentialForCalculation, $remainingBasicDeduction + $remainingDebt);
+    $residentialBasicUsed = min($remainingBasicDeduction, $residentialDeduction);
+    $residentialDebtUsed = $residentialDeduction - $residentialBasicUsed;
+    $remainingBasicDeduction -= $residentialBasicUsed;
+    $remainingDebt -= $residentialDebtUsed;
+    $residentialPropertyAfterDeduction = $residentialForCalculation - $residentialDeduction;
+    
+    $generalDeduction = min($totalGeneralProperty, $remainingBasicDeduction + $remainingDebt);
+    $generalBasicUsed = min($remainingBasicDeduction, $generalDeduction);
+    $generalDebtUsed = $generalDeduction - $generalBasicUsed;
+    $remainingBasicDeduction -= $generalBasicUsed;
+    $remainingDebt -= $generalDebtUsed;
+    $generalPropertyAfterDeduction = $totalGeneralProperty - $generalDeduction;
+    
+    $financialAfterFixed = max(0, $financialRaw - $FINANCIAL_ASSET_DEDUCTION);
+    $financialFixedDeductionAmount = $financialRaw - $financialAfterFixed;
+    $financialDeduction = min($financialAfterFixed, $remainingBasicDeduction + $remainingDebt);
+    $financialBasicUsed = min($remainingBasicDeduction, $financialDeduction);
+    $financialDebtUsed = $financialDeduction - $financialBasicUsed;
+    $remainingBasicDeduction -= $financialBasicUsed;
+    $remainingDebt -= $financialDebtUsed;
+    $financialPropertyAfterDeduction = $financialAfterFixed - $financialDeduction;
+    
+    $isWorkUnablePropertyExempt = false;
+    $workUnablePropertyLimit = 0;
+    $workUnableFinancialLimit = 0;
+    $workUnableTotalProperty = 0;
+    $workUnableNetProperty = 0;
+    
+    if (!empty($data['hasPropertyException']) && $data['hasPropertyException'] === true) {
+        $workUnablePropertyLimit = $WORK_UNABLE_PROPERTY_LIMITS[$region] ?? $WORK_UNABLE_PROPERTY_LIMITS['seoul'];
+        $workUnableFinancialLimit = $WORK_UNABLE_FINANCIAL_LIMITS[$region] ?? $WORK_UNABLE_FINANCIAL_LIMITS['seoul'];
+        $workUnableTotalProperty = $adjustedResidential + $generalRaw + $automobileRaw + $financialRaw;
+        $workUnableNetProperty = max(0, $workUnableTotalProperty - $debtRaw);
+        $hasFullConversionAutomobile = ($automobileRaw > 0);
+        if ($workUnableNetProperty <= $workUnablePropertyLimit && $financialRaw <= $workUnableFinancialLimit && !$hasFullConversionAutomobile) {
+            $isWorkUnablePropertyExempt = true;
+        }
+    }
+    
+    if ($isWorkUnablePropertyExempt) {
+        $residentialPropertyConversion = 0;
+        $generalPropertyConversion = 0;
+        $financialPropertyConversion = 0;
+        $totalPropertyConversion = 0;
+    } else {
+        $residentialPropertyConversion = $residentialPropertyAfterDeduction * 0.0104;
+        $generalPropertyConversion = $generalPropertyAfterDeduction * 0.0417;
+        $financialPropertyConversion = $financialPropertyAfterDeduction * $financialPropertyRateValue;
+        $totalPropertyConversion = $residentialPropertyConversion + $generalPropertyConversion + $financialPropertyConversion;
+    }
+    
+    return [
+        'totalEarnedRaw' => $totalEarnedRaw,
+        'incomeDetails' => $incomeDetails,
+        'evaluatedEarnedIncome' => $evaluatedEarnedIncome,
+        'privateTransferTotalInput' => $privateTransferTotalInput,
+        'evaluatedPrivateTransferIncome' => $evaluatedPrivateTransferIncome,
+        'evaluatedPublicTransferIncome' => $evaluatedPublicTransferIncome,
+        'evaluatedRentalIncome' => $propertyRentalIncome,
+        'evaluatedInterestIncome' => $evaluatedInterestIncome,
+        'expenditureDeductionRaw' => $expenditureDeductionRaw,
+        'totalIncomeEvaluation' => $totalIncomeEvaluation,
+        'residentialPropertyRaw' => $residentialRaw,
+        'residentialPropertyRate' => $residentialPropertyRate,
+        'generalPropertyRaw' => $generalRaw,
+        'automobilePropertyRaw' => $automobileRaw,
+        'financialPropertyRaw' => $financialRaw,
+        'debtRaw' => $debtRaw,
+        'residentialPropertyAfterDeduction' => $residentialPropertyAfterDeduction,
+        'generalPropertyAfterDeduction' => $generalPropertyAfterDeduction,
+        'financialPropertyAfterDeduction' => $financialPropertyAfterDeduction,
+        'residentialPropertyConversion' => $residentialPropertyConversion,
+        'generalPropertyConversion' => $generalPropertyConversion,
+        'financialPropertyConversion' => $financialPropertyConversion,
+        'totalPropertyConversion' => $totalPropertyConversion,
+        'isWorkUnablePropertyExempt' => $isWorkUnablePropertyExempt,
+        'workUnableNetProperty' => $workUnableNetProperty,
+        'workUnableResidentialProperty' => $adjustedResidential,
+        'workUnableGeneralProperty' => $generalRaw + $automobileRaw,
+        'workUnableFinancialProperty' => $financialRaw,
+        'workUnableDebt' => $debtRaw,
+        'workUnablePropertyLimit' => $workUnablePropertyLimit,
+        'workUnableFinancialLimit' => $workUnableFinancialLimit,
+        'residentialPropertyLimit' => $residentialLimit,
+        'residentialExcess' => $residentialExcess,
+        'residentialPropertyForCalc' => $residentialForCalculation,
+        'residentialPropertyDeduction' => $residentialDeduction,
+        'residentialBasicDedUsed' => $residentialBasicUsed,
+        'residentialDebtUsed' => $residentialDebtUsed,
+        'totalGeneralProperty' => $totalGeneralProperty,
+        'generalPropertyDeduction' => $generalDeduction,
+        'generalBasicDedUsed' => $generalBasicUsed,
+        'generalDebtUsed' => $generalDebtUsed,
+        'financialFixedDeductionAmount' => $financialFixedDeductionAmount,
+        'financialRemainingDeductionAmount' => $financialDeduction,
+        'financialBasicDedUsed' => $financialBasicUsed,
+        'financialDebtUsed' => $financialDebtUsed,
+        'basicPropertyDeduction' => $basicDeductionAmount,
+        'financialPropertyRateValue' => $financialPropertyRateValue
+    ];
+}
+
+// --- 理쒖쥌 ?묐떟 ?⑦궎吏?---
+$gicho = calcGicho($data, $MEDIAN_INCOME, $THRESHOLDS, $DEDUCTION_AMOUNTS);
+$gicho['details'] = getCalculationDetails($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS[$data['region']], false, 0.0626);
+
+$hanbumo = calcHanbumo($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS, $HANBUMO_THRESHOLDS);
+$hanbumo['details'] = getCalculationDetails($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS[$data['region']], false, 0.0626);
+
+$chasangwi = calcChasangwi($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS, $CHASANGWI_THRESHOLDS);
+$chasangwi['details'] = getCalculationDetails($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS[$data['region']], true, 0.0417);
+
+$chasangwiMedical = calcChasangwiMedical($data, $MEDIAN_INCOME, $MEDICAL_DEDUCTION_AMOUNTS, $CHASANGWI_THRESHOLDS);
+$chasangwiMedical['details'] = getCalculationDetails($data, $MEDIAN_INCOME, $MEDICAL_DEDUCTION_AMOUNTS[$data['region']], true, 0.0626, true);
+
+echo json_encode([
+    'success' => true,
+    'data' => [
+        'gicho' => $gicho,
+        'hanbumo' => $hanbumo,
+        'chasangwi' => $chasangwi,
+        'chasangwiMedical' => $chasangwiMedical,
+        'finalAmounts' => [
+            'gicho' => $gicho['income'],
+            'hanbumo' => $hanbumo['income'],
+            'chasangwi' => $chasangwi['income'],
+            'chasangwiMedical' => $chasangwiMedical['income']
+        ]
+    ]
+]);
+?>
+
