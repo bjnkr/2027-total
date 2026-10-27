@@ -1,0 +1,59 @@
+.earned-income-dialog.modal-content { position: fixed; inset: 0; margin: auto; width: min(520px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px); padding: 0 !important; border: 1px solid #d5e3f0; border-radius: 20px; background: #fff; color: #243c56; box-shadow: 0 24px 80px #153b6640; overflow: hidden; text-align: left; }
+.earned-income-dialog[open] { display: flex; flex-direction: column; }
+.earned-income-dialog::backdrop { background: #142c3d80; backdrop-filter: blur(3px); }
+.earned-income-header { margin: 0; padding: 24px 28px 20px; background: linear-gradient(135deg, #f0f7fd, #fff); border-bottom: 1px solid #e1eaf3; flex-shrink: 0; }
+.earned-income-heading-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.earned-income-heading-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; background: #e1effc; color: var(--primary-color, #005a9c); }
+.earned-income-eyebrow { color: #527899; font-size: 0.8rem; font-weight: 700; }
+.earned-income-close { display: grid; place-items: center; margin-left: auto; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: #eaf1f8; color: #627e99; font-size: 1.5rem; cursor: pointer; }
+.earned-income-header h2 { margin: 0; color: #173859; font-size: 1.35rem; font-weight: 800; line-height: 1.45; letter-spacing: -0.04em; word-break: keep-all; text-align: left; white-space: normal; }
+.earned-income-header p { margin: 8px 0 0; color: #6b7e92; font-size: 0.85rem; line-height: 1.65; word-break: keep-all; text-align: left; white-space: normal; }
+.earned-income-progress { display: flex; align-items: center; gap: 24px; list-style: none; padding: 0; margin: 20px 0 0; }
+.earned-income-progress li { display: flex; align-items: center; gap: 7px; color: #8a9aab; font-size: 0.78rem; }
+.earned-income-progress li + li::before { content: ''; width: 20px; height: 1px; margin-right: 4px; background: #ccdae8; }
+.earned-income-progress li > span { display: grid; place-items: center; width: 23px; height: 23px; border: 1px solid #d7e2ed; border-radius: 50%; background: #fff; font-size: 0.72rem; font-weight: 700; }
+.earned-income-progress .is-current { color: var(--primary-color, #005a9c); font-weight: 700; }
+.earned-income-progress .is-current > span { border-color: var(--primary-color, #005a9c); background: var(--primary-color, #005a9c); color: #fff; }
+.earned-income-progress .is-complete > span { background: #e1effc; border-color: #c4dbef; color: var(--primary-color, #005a9c); }
+.earned-income-body { min-height: 0; padding: 24px 28px; overflow-y: auto; overscroll-behavior: contain; }
+.earned-income-field-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 14px; }
+.earned-income-field-heading h3 { margin: 0; color: #344e69; font-size: 0.9rem; font-weight: 700; }
+.earned-income-field-heading > span { padding: 4px 8px; border-radius: 6px; background: #f0f4f8; color: #71859a; font-size: 0.72rem; }
+.earned-count-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 10px; }
+.earned-count-option { position: relative; display: grid; place-items: center; min-height: 88px; padding: 20px 12px; border: 1px solid #d8e3ee; border-radius: 12px; background: #fff; color: #526a81; font: inherit; font-size: 1.35rem; font-weight: 700; cursor: pointer; transition: background 150ms ease, border-color 150ms ease; }
+.earned-count-option:hover, .earned-age-option:hover { background: #f3f8fd; border-color: #98bedf; }
+.earned-count-option[aria-pressed="true"], .earned-age-option[aria-pressed="true"] { border-color: #1676b8; box-shadow: inset 0 0 0 1px #1676b8; background: #edf6ff; color: #005a9c; }
+.earned-selection-mark { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 17px; height: 17px; border: 1px solid #d6e1ec; border-radius: 50%; background: #fff; }
+.earned-selection-mark.is-selected { background: #1676b8; border-color: #1676b8; color: #fff; }
+.earned-income-hint { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0 0; padding: 11px 12px; border-radius: 8px; background: #f5f8fb; color: #708398; font-size: 0.76rem; line-height: 1.65; }
+.earned-income-hint .calc-icon { width: 17px; height: 17px; margin-top: 2px; color: #6b91b4; }
+.earned-age-members { display: grid; gap: 16px; }
+.earned-age-member { min-width: 0; margin: 0; padding: 14px; border: 1px solid #dce6f0; border-radius: 12px; background: #fbfdff; }
+.earned-age-member legend { padding: 0 6px; color: #47627e; font-size: 0.82rem; font-weight: 700; }
+.earned-age-member legend > span { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 6px; border-radius: 7px; background: #e3effb; color: #216da5; font-size: 0.72rem; }
+.earned-age-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.earned-age-option { min-height: 44px; padding: 10px 4px; border: 1px solid #d8e3ee; border-radius: 8px; background: #fff; color: #5b728a; font: inherit; font-size: 0.8rem; cursor: pointer; word-break: keep-all; }
+.earned-age-member.needs-selection { border-color: #e4a0a0; }
+.earned-income-error { margin: 12px 0 0; color: #c53737; font-size: 0.8rem; }
+.earned-income-footer { display: flex; gap: 10px; padding: 16px 28px 20px; border-top: 1px solid #e3ebf3; background: #fff; flex-shrink: 0; }
+.earned-income-footer > button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 12px 20px; border-radius: 10px; font: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer; }
+.earned-income-secondary { flex: 1; border: 1px solid #d8e3ee; background: #fff; color: #6c8096; }
+.earned-income-primary { flex: 2; border: 1px solid var(--primary-color, #005a9c); background: var(--primary-color, #005a9c); color: #fff; box-shadow: 0 3px 8px #005a9c18; }
+.earned-income-primary:hover { background: #004879; }
+.earned-income-dialog button:focus-visible { outline: 3px solid #87bce8; outline-offset: 3px; }
+@media (max-width: 480px) {
+    .earned-income-dialog.modal-content { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); border-radius: 16px; }
+    .earned-income-header { padding: 20px 20px 16px; }
+    .earned-income-header h2 { font-size: 1.17rem; }
+    .earned-income-body { padding: 20px; }
+    .earned-count-options { grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 8px; }
+    .earned-count-option { min-height: 78px; font-size: 1.2rem; }
+    .earned-income-footer { padding: 14px 20px 18px; }
+    .earned-age-member { padding: 12px 10px; }
+    .earned-age-options { gap: 6px; }
+    .earned-age-option { font-size: 0.75rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .earned-income-dialog.modal-content { animation: none; }
+    .earned-count-option { transition: none; }
+}

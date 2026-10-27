@@ -1,5 +1,5 @@
 <?php
-$g5_path = '../../..';
+$g5_path = dirname(__DIR__, 3);
 $common_file = $g5_path.'/common.php';
 
 if (file_exists($common_file)) {

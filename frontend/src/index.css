@@ -500,6 +500,16 @@ header p {
   gap: 1.5rem;
 }
 
+.basic-info-grid > .form-group { min-width: 0; }
+.basic-info-property > .radio-group-box { margin-top: 0.5rem; }
+
+@media (min-width: 768px) {
+  .basic-info-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .basic-info-grid #householdSize,
+  .basic-info-property > .radio-group-box { height: 52px; box-sizing: border-box; }
+  .basic-info-property > .radio-group-box { margin-top: 0; align-items: center; }
+}
+
 @media (min-width: 768px) {
   .form-grid {
     grid-template-columns: 1fr 1fr;
@@ -2468,6 +2478,7 @@ input[type=number] {
 }
 
 .mobile-unit-text {
+    white-space: nowrap;
     display: none;
 }
 
@@ -2664,6 +2675,8 @@ input[type=number] {
     flex-direction: column;
     gap: 6px;
 }
+.benefit-item-outcome { display: flex; flex-direction: column; align-items: flex-end; }
+.benefit-item-outcome > .status-badge { margin-bottom: 6px; }
 .benefit-name {
     font-size: 1.1rem;
     font-weight: 800;
@@ -2854,36 +2867,29 @@ input[type=number] {
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background-color: #ef4444;
-    color: white;
-    border: none;
-    font-size: 11px;
-    font-weight: bold;
+    flex-shrink: 0;
+    gap: 5px;
+    min-height: 34px;
+    padding: 6px 9px;
+    border: 1px solid #c6ddec;
+    border-radius: 8px;
+    background: #eef7ff;
+    color: #005a9c;
+    font: inherit;
+    font-size: .78rem;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
     cursor: pointer;
-    margin-left: 6px;
-    vertical-align: middle;
-    transition: transform 0.2s;
-    line-height: 1;
-    padding-bottom: 1px;
-    position: relative; /* 터치 영역 확장을 위해 추가 */
 }
-
-/* 모바일 터치 영역 (Hit Area) 확대 */
-.help-btn::after {
-    content: '';
-    position: absolute;
-    top: -15px;
-    left: -15px;
-    right: -15px;
-    bottom: -15px;
-}
-
-.help-btn:hover {
-    transform: scale(1.1);
-    background-color: #dc2626;
+.help-btn:hover { border-color: #7aaed5; background: #e0effb; }
+.help-btn:focus-visible { outline: 3px solid #4a96d1; outline-offset: 2px; }
+.step-section-title:has(> .help-btn), .income-title-wrapper h5:has(> .help-btn) { flex-wrap: wrap; gap: 8px 12px; min-width: 0; }
+.step-header { flex-wrap: wrap; gap: 10px 16px; }
+@media (max-width: 767px) {
+    .help-btn { min-height: 44px; padding: 8px 10px; }
+    .step-section-title:has(> .help-btn) { width: 100%; }
+    .income-title-wrapper h5:has(> .help-btn) { width: 100%; }
 }
 
 /* 모바일 모달 내역 UI 최적화 */
@@ -3182,3 +3188,71 @@ input[type=number] {
     object-fit: contain;
 }
 .result-resource-placeholder { margin: 0; padding: 48px 12px; text-align: center; color: #64748b; }
+
+.region-field { min-width: 0; margin: 0; padding: 0; border: 0; }
+.automobile-fields-divider { grid-column: 1 / -1; width: 100%; margin: -4px 0; border: 0; border-top: 1px solid #ccdbe8; }
+.region-field > legend { margin-bottom: 0.6rem; padding: 0; color: #0f172a; font-size: 1.05rem; font-weight: 500; }
+.region-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.region-options .region-option { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 48px; margin: 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 7px; background: #fff; color: #475569; font-size: 0.9rem; cursor: pointer; }
+.region-options .region-option:has(input:checked) { border-color: #80b1d7; background: #eff6ff; color: var(--primary-color); font-weight: 600; }
+.region-options .region-option input { width: 18px; height: 18px; flex-shrink: 0; margin: 0; padding: 0; accent-color: var(--primary-color); }
+.region-options .region-option:has(input:focus-visible) { outline: 2px solid var(--primary-color); outline-offset: 3px; }
+@media (max-width: 767px) { .region-options { grid-template-columns: 1fr; gap: 8px; } }
+
+@media (max-width: 767px) {
+    body:has(.result-page-container) { padding-inline: 8px; }
+    .container:has(.result-page-container) { padding-inline: 8px; }
+    .result-page-container .benefit-card { min-width: 0; height: auto; padding: 20px 12px; border-width: 6px; border-radius: 16px; }
+    .result-page-container .card-title-decor { gap: 8px; margin-bottom: 18px; }
+    .result-page-container .decor-line { display: none; }
+    .result-page-container .card-title-decor h3 { padding: 0; word-break: keep-all; text-align: center; }
+    .result-page-container .income-summary-box { padding: 12px; margin-bottom: 18px; gap: 8px; flex-wrap: wrap; }
+    .result-page-container .income-label-box { min-width: 0; }
+    .result-page-container .income-amount-box { margin-left: auto; white-space: nowrap; }
+    .result-page-container .benefit-list { gap: 12px; margin-bottom: 18px; }
+    .result-page-container .benefit-item-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 12px; padding: 14px 12px; }
+    .result-page-container .benefit-item-info, .result-page-container .benefit-item-outcome { display: contents; }
+    .result-page-container .benefit-name { grid-column: 1; grid-row: 1; white-space: nowrap; }
+    .result-page-container .benefit-item-info > .benefit-criteria { grid-column: 1 / -1; grid-row: 2; line-height: 1.6; }
+    .result-page-container .benefit-more { grid-column: 1 / -1; grid-row: 3; }
+    .result-page-container .benefit-item-header:has(> .benefit-item-outcome) .benefit-more { grid-row: 4; }
+    .result-page-container .benefit-item-header > .status-badge,
+    .result-page-container .benefit-item-outcome > .status-badge { grid-column: 2; grid-row: 1; margin-bottom: 0; }
+    .result-page-container .benefit-item-outcome > div { grid-column: 1 / -1; grid-row: 3; text-align: right; }
+    .result-page-container .status-badge { min-width: 60px; padding: 6px 12px; line-height: 1.5; white-space: nowrap; }
+    .result-page-container .benefit-item-details { padding: 12px; }
+    .result-page-container .benefit-item-details > div { gap: 8px; flex-wrap: wrap; }
+    .result-page-container .benefit-item-details > div > span:last-child { margin-left: auto; text-align: right; }
+    .result-page-container .benefit-item.single-item { gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+}
+
+/* Keep the income form wide and readable on phones without altering desktop forms. */
+@media (max-width: 767px) {
+    body:has(.income-input-step) { padding-inline: 8px; }
+    .container:has(.income-input-step) { padding-inline: 8px; }
+    .income-input-step > .income-section { padding: 12px 0; border: 0; background: transparent; gap: 0; }
+    .income-input-step .step-header { gap: 8px; margin-bottom: 16px; padding-inline: 4px; }
+    .income-input-step .income-category { min-width: 0; padding: 16px 12px; margin-bottom: 18px; box-shadow: none; }
+    .income-input-step .income-category:last-of-type { margin-bottom: 0; }
+    .income-input-step .income-title-wrapper { margin-bottom: 16px; }
+    .income-input-step .income-entry-item { min-width: 0; margin-top: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+    .income-input-step .income-entry-item + .income-entry-item { margin-top: 24px; }
+    .income-input-step .income-item-title { position: static; padding: 0 0 10px; border-bottom: 1px solid #e2e8f0; background: transparent; line-height: 1.5; }
+    .income-input-step .income-entry, .income-input-step .form-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .income-input-step .income-entry > .form-group > label { margin-bottom: 4px; }
+    .income-input-step .form-group, .income-input-step .input-wrapper { min-width: 0; }
+    .income-input-step .form-group input:not([type="radio"]):not([type="checkbox"]),
+    .income-input-step .form-group select { min-width: 0; max-width: 100%; min-height: 48px; box-sizing: border-box; }
+    .income-input-step .description { line-height: 1.65; }
+    .income-input-step .private-support-options { flex-direction: column; gap: 8px; padding: 0; border: 0; background: transparent; }
+    .income-input-step .private-support-options .radio-option { min-height: 48px; padding: 10px 12px; box-sizing: border-box; border: 1px solid #dce2e8; border-radius: 7px; background: #f8fafc; }
+    .income-input-step .private-support-options .radio-option:has(input:checked) { border-color: #80b1d7; background: #eff6ff; }
+    .income-input-step .private-support-options input { flex-shrink: 0; }
+    .income-input-step .private-support-options label { flex: 1; font-size: 1rem; line-height: 1.5; white-space: normal; word-break: keep-all; }
+    .income-input-step .private-transfer-amount-group, .income-input-step .monthly-grid-group { margin-top: 18px; }
+    .income-input-step .checkbox-group-box { padding: 10px; }
+    .income-input-step .checkbox-description { flex-basis: 100%; line-height: 1.6; }
+    .step-header:has(> .unit-change-badge) { flex-direction: column; align-items: stretch; gap: 8px; }
+    .step-header:has(> .unit-change-badge) > .step-section-title { white-space: nowrap; }
+    .step-header > .unit-change-badge { align-self: flex-end; }
+}

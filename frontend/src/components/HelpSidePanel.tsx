@@ -16,7 +16,12 @@ const INCOME_HELP_TOPICS = ['earned_income', 'private_transfer', 'public_transfe
 const STEP_HELP_TOPICS = ['basic_info', 'earned_income', 'automobile_business', 'property_debt'];
 const STEP_HELP_LABELS = ['기본 정보', '소득 정보', '자동차', '재산/부채'];
 
-export default function HelpSidePanel({ topic, onClose, showResultResources: defaultResultResources = false, showAllIncome: defaultAllIncome = false, focusedTopic = null, focusRequestId = 0 }: Props) {
+export default function HelpSidePanel(props: Props) {
+    const resetKey = JSON.stringify([props.topic, props.showAllIncome, props.showResultResources, props.focusedTopic, props.focusRequestId]);
+    return <HelpSidePanelContent key={resetKey} {...props} />;
+}
+
+function HelpSidePanelContent({ topic, onClose, showResultResources: defaultResultResources = false, showAllIncome: defaultAllIncome = false, focusedTopic = null, focusRequestId = 0 }: Props) {
     const [viewedStep, setViewedStep] = useState<number | null>(null);
     const requestedResources = topic === 'major_criteria';
     const showAllIncome = viewedStep === null ? defaultAllIncome && !requestedResources : viewedStep === 2;
@@ -31,19 +36,6 @@ export default function HelpSidePanel({ topic, onClose, showResultResources: def
         focusedTopic && INCOME_HELP_TOPICS.includes(focusedTopic) ? focusedTopic : 'earned_income'
     );
     const [expandedSection, setExpandedSection] = useState<number | null>(0);
-
-    useEffect(() => {
-        setExpandedSection(0);
-        setViewedStep(null);
-        if (contentRef.current) contentRef.current.scrollTop = 0;
-    }, [topic, defaultAllIncome, focusRequestId, defaultResultResources]);
-
-    useEffect(() => {
-        if (!showAllIncome) return;
-        setSelectedIncomeTopic(
-            focusedTopic && INCOME_HELP_TOPICS.includes(focusedTopic) ? focusedTopic : 'earned_income'
-        );
-    }, [showAllIncome, focusedTopic, focusRequestId]);
 
     useEffect(() => {
         if (!showAllIncome) return;

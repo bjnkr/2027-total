@@ -34,7 +34,7 @@ try {
     ];
     let comparisons = 0;
     for (const [name, form] of fixtures) {
-        const response = await fetch('http://127.0.0.1:5173/calc/2027/api/calculate.php', {
+        const response = await fetch('http://127.0.0.1:5173/calc/total2027/api/calculate.php', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
         });
         assert.equal(response.status, 200);

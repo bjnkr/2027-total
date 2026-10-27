@@ -72,7 +72,7 @@ export default function Step3Automobile({ formData, setFormData, setAlertMessage
                     <h2 className="step-section-title">3. 자동차</h2>
                     <div className="unit-change-badge">
                         <span className="desktop-unit-text">금액 단위 변경 : 입력 칸 <span className="highlight-green">만원</span> 클릭</span>
-                        <span className="mobile-unit-text">단위변경 :<br /> <span className="highlight-green">만원</span>클릭</span>
+                        <span className="mobile-unit-text">단위변경 : <span className="highlight-green">만원</span> 클릭</span>
                     </div>
                 </div>
                 <div className="section-alert">
@@ -143,6 +143,7 @@ export default function Step3Automobile({ formData, setFormData, setAlertMessage
                         </div>
                     )}
 
+                    <hr className="automobile-fields-divider" />
                     <div className="form-group">
                         <label htmlFor="automobileDisplacement" className="flex-label">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="label-icon">

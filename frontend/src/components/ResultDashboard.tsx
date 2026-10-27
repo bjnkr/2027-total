@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import type { CalculationResults, UnifiedFormState, CalculationDetails } from '../types';
 import CalculationDetailsModal from './CalculationDetailsModal';
-import { MEDIAN_INCOME } from '../App';
+import StepSelectionModal from './StepSelectionModal';
+import SupportObligationModal from './SupportObligationModal';
+import LivelihoodSupportModal from './LivelihoodSupportModal';
+import CalculationIcon from './CalculationIcon';
+import { MEDIAN_INCOME } from '../data/benefitStandards';
 
 interface ResultDashboardProps {
     formData: UnifiedFormState;
@@ -22,6 +26,8 @@ export default function ResultDashboard({ formData, results, onReset, onNavigate
     const [rentInputUnit, setRentInputUnit] = useState<'won'|'manwon'>('manwon');
     const [customHousingBenefit, setCustomHousingBenefit] = useState<number | null>(null);
     const [showStepModal, setShowStepModal] = useState(false);
+    const [showSupportObligation, setShowSupportObligation] = useState(false);
+    const [showLivelihoodSupport, setShowLivelihoodSupport] = useState(false);
     const [housingCalcDetails, setHousingCalcDetails] = useState<{
         rentAmount: number;
         depositConversion: number;
@@ -57,25 +63,22 @@ export default function ResultDashboard({ formData, results, onReset, onNavigate
         const rentAmountRaw = parseInt(rawRentStr) || 0;
         const rentAmount = rentInputUnit === 'manwon' ? rentAmountRaw * 10000 : rentAmountRaw;
         const region = formData.region;
-        const size = Math.min(parseInt(formData.householdSize) || 1, 7);
         const income = gicho?.income || 0;
         const depositRaw = parseInt(formData.residentialProperty.replace(/,/g, '')) || 0;
         const depositMultiplier = formData.inputUnits?.residentialProperty === 'won' ? 1 : 10000;
         const deposit = depositRaw * depositMultiplier;
-
-        const STANDARD_RENT: Record<string, number[]> = {
-            'seoul': [0, 381000, 431000, 514000, 596000, 618000, 731000, 731000],
-            'gyeonggi': [0, 313000, 352000, 422000, 488000, 505000, 599000, 599000],
-            'metro': [0, 259000, 291000, 347000, 403000, 418000, 492000, 492000],
-            'other': [0, 234000, 265000, 318000, 369000, 382000, 452000, 452000]
-        };
 
         let housingRegion = region;
         if (region === 'metro' && isIncheon) {
             housingRegion = 'gyeonggi';
         }
 
-        const standardRent = STANDARD_RENT[housingRegion]?.[size] || STANDARD_RENT['seoul'][1];
+        const standardRent = gicho?.standardRentByRegion?.[housingRegion];
+        if (standardRent === undefined) {
+            setShowRentModal(false);
+            window.alert('기준임대료 정보를 불러오려면 모의계산을 다시 실행해 주세요.');
+            return;
+        }
         const depositConversion = deposit * 0.04 / 12;
         const actualRent = rentAmount + depositConversion;
         const rentToUse = Math.min(standardRent, actualRent);
@@ -161,15 +164,15 @@ export default function ResultDashboard({ formData, results, onReset, onNavigate
                                         <span className="benefit-name">🍚 생계급여</span>
                                         <span className="benefit-criteria">선정기준: {thresholdGichoLivelihood.toLocaleString()}원</span>
                                         {gicho?.livelihoodEligible && (
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '0.8rem', marginTop: '4px' }}>
+                                            <span className="benefit-more" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '0.8rem', marginTop: '4px' }}>
                                                 <svg style={{ transition: 'transform 0.3s', transform: expandedGichoItem === 'livelihood' ? 'rotate(180deg)' : 'none' }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                                 <span>상세보기</span>
                                             </span>
                                         )}
                                     </div>
                                     {gicho?.livelihoodEligible && gicho?.livelihoodBenefitAmount !== undefined && gicho.livelihoodBenefitAmount > 0 ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                            <span className="status-badge possible" style={{ marginBottom: '6px' }}>가능</span>
+                                        <div className="benefit-item-outcome">
+                                            <span className="status-badge possible">가능</span>
                                             <div style={{ color: '#1d4ed8', fontSize: '1.3rem', fontWeight: 'bold' }}>
                                                 {(Math.ceil(gicho.livelihoodBenefitAmount / 10) * 10).toLocaleString()}<span style={{fontSize: '0.9rem', marginLeft: '2px', color: '#1e293b'}}>원</span>
                                             </div>
@@ -180,6 +183,11 @@ export default function ResultDashboard({ formData, results, onReset, onNavigate
                                         </span>
                                     )}
                                 </div>
+                                {gicho?.livelihoodEligible && (
+                                    <button type="button" className="livelihood-support-button" aria-haspopup="dialog" onClick={() => setShowLivelihoodSupport(true)}>
+                                        <CalculationIcon name="people" /> 부양의무자 기준
+                                    </button>
+                                )}
                                 {expandedGichoItem === 'livelihood' && gicho?.livelihoodEligible && (
                                     <div className="benefit-item-details">
                                         <p style={{fontWeight: 'bold', marginBottom: '8px', color: '#1e293b'}}>생계급여 산출 방식</p>
@@ -206,7 +214,7 @@ export default function ResultDashboard({ formData, results, onReset, onNavigate
                                         <span className="benefit-name">🏥 의료급여</span>
                                         <span className="benefit-criteria">선정기준: {thresholdGichoMedical.toLocaleString()}원</span>
                                         {gicho?.medicalEligible && (
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '0.8rem', marginTop: '4px' }}>
+                                            <span className="benefit-more" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '0.8rem', marginTop: '4px' }}>
                                                 <svg style={{ transition: 'transform 0.3s', transform: expandedGichoItem === 'medical' ? 'rotate(180deg)' : 'none' }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                                 <span>상세보기</span>
                                             </span>
@@ -230,15 +238,15 @@ export default function ResultDashboard({ formData, results, onReset, onNavigate
                                         <span className="benefit-name">🏠 주거급여</span>
                                         <span className="benefit-criteria">선정기준: {thresholdGichoHousing.toLocaleString()}원</span>
                                         {gicho?.housingEligible && (
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '0.8rem', marginTop: '4px' }}>
+                                            <span className="benefit-more" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '0.8rem', marginTop: '4px' }}>
                                                 <svg style={{ transition: 'transform 0.3s', transform: expandedGichoItem === 'housing' ? 'rotate(180deg)' : 'none' }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                                 <span>상세보기</span>
                                             </span>
                                         )}
                                     </div>
                                     {gicho?.housingEligible ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                            <span className="status-badge possible" style={{ marginBottom: '6px' }}>가능</span>
+                                        <div className="benefit-item-outcome">
+                                            <span className="status-badge possible">가능</span>
                                             {gicho.housingBenefitAmount === -1 ? (
                                                 <div style={{ color: '#1d4ed8', fontSize: '1rem', fontWeight: 'bold' }}>수선유지급여</div>
                                             ) : customHousingBenefit !== null ? (
@@ -315,7 +323,7 @@ export default function ResultDashboard({ formData, results, onReset, onNavigate
                                         <span className="benefit-name">📚 교육급여</span>
                                         <span className="benefit-criteria">선정기준: {thresholdGichoEducation.toLocaleString()}원</span>
                                         {gicho?.educationEligible && (
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '0.8rem', marginTop: '4px' }}>
+                                            <span className="benefit-more" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '0.8rem', marginTop: '4px' }}>
                                                 <svg style={{ transition: 'transform 0.3s', transform: expandedGichoItem === 'education' ? 'rotate(180deg)' : 'none' }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                                 <span>상세보기</span>
                                             </span>
@@ -403,6 +411,11 @@ export default function ResultDashboard({ formData, results, onReset, onNavigate
                         {chasangwiMedical?.details && (
                             <button className="details-btn-styled" onClick={() => setModalConfig({ title: '차상위 본인부담경감 상세내역', details: chasangwiMedical.details!, finalIncome: chasangwiMedical.income, excludePrivateTransfer: true })}>
                                 계산 내역 보기 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                            </button>
+                        )}
+                        {chasangwiMedical?.eligible && (
+                            <button type="button" className="support-obligation-chart-button" onClick={() => setShowSupportObligation(true)}>
+                                <CalculationIcon name="people" /> 부양의무자 기준표
                             </button>
                         )}
                     </div>
@@ -512,19 +525,10 @@ export default function ResultDashboard({ formData, results, onReset, onNavigate
                 </div>
             )}
             {showStepModal && (
-                <div className="modal-overlay" onClick={() => setShowStepModal(false)} style={{ zIndex: 1000 }}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '30px' }}>
-                        <h3 style={{ marginBottom: '20px', color: '#0f4c81', fontSize: '1.2rem', fontWeight: 'bold' }}>수정할 단계를 선택하세요</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <button onClick={() => onNavigate(1)} style={{ padding: '12px', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#f8fafc', color: '#334155', cursor: 'pointer', fontWeight: '500', fontSize: '1rem', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor='#f1f5f9'} onMouseOut={e => e.currentTarget.style.backgroundColor='#f8fafc'}>1단계: 기본 정보</button>
-                            <button onClick={() => onNavigate(2)} style={{ padding: '12px', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#f8fafc', color: '#334155', cursor: 'pointer', fontWeight: '500', fontSize: '1rem', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor='#f1f5f9'} onMouseOut={e => e.currentTarget.style.backgroundColor='#f8fafc'}>2단계: 소득 정보</button>
-                            <button onClick={() => onNavigate(3)} style={{ padding: '12px', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#f8fafc', color: '#334155', cursor: 'pointer', fontWeight: '500', fontSize: '1rem', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor='#f1f5f9'} onMouseOut={e => e.currentTarget.style.backgroundColor='#f8fafc'}>3단계: 자동차</button>
-                            <button onClick={() => onNavigate(4)} style={{ padding: '12px', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#f8fafc', color: '#334155', cursor: 'pointer', fontWeight: '500', fontSize: '1rem', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor='#f1f5f9'} onMouseOut={e => e.currentTarget.style.backgroundColor='#f8fafc'}>4단계: 재산/부채</button>
-                        </div>
-                        <button onClick={() => setShowStepModal(false)} style={{ marginTop: '20px', padding: '10px 20px', background: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#475569', fontWeight: 'bold' }}>취소</button>
-                    </div>
-                </div>
+                <StepSelectionModal onClose={() => setShowStepModal(false)} onSelect={step => { setShowStepModal(false); onNavigate(step); }} />
             )}
+            {showSupportObligation && <SupportObligationModal onClose={() => setShowSupportObligation(false)} />}
+            {showLivelihoodSupport && <LivelihoodSupportModal onClose={() => setShowLivelihoodSupport(false)} />}
         </div>
     );
 }

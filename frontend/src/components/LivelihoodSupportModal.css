@@ -1,0 +1,27 @@
+.livelihood-support-dialog.modal-content { position: fixed; inset: 0; margin: auto; width: min(500px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 24px); padding: 0 !important; border: 1px solid #d5e3f0; border-radius: 18px; background: #fff; color: #243c56; box-shadow: 0 24px 80px #153b6640; overflow: hidden; text-align: left; }
+.livelihood-support-dialog[open] { display: flex; flex-direction: column; }
+.livelihood-support-dialog::backdrop { background: #142c3d80; backdrop-filter: blur(3px); }
+.livelihood-support-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; margin: 0; padding: 20px 24px; border-bottom: 1px solid #e1eaf3; background: #f0f7fd; text-align: left; }
+.livelihood-support-header > div > span { color: #647b90; font-size: .8rem; }
+.livelihood-support-header h2 { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; color: #005a9c; font-size: 1.2rem; line-height: 1.4; }
+.livelihood-support-close { flex-shrink: 0; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 9px; background: #e1edf8; color: #52718f; font: inherit; font-size: 1.4rem; cursor: pointer; }
+.livelihood-support-body { display: flex; flex-direction: column; gap: 14px; min-height: 0; padding: 24px; overflow: auto; }
+.livelihood-support-criterion { padding: 18px; border: 1px solid #dce6ef; border-radius: 12px; background: #fbfdff; }
+.livelihood-support-criterion h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; color: #365b7a; font-size: .95rem; }
+.livelihood-support-amount { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; margin: 0; font-size: .95rem; }
+.livelihood-support-amount strong { color: #005a9c; font-size: 1.45rem; }
+.livelihood-support-note { margin: 10px 0 0; color: #647b90; font-size: .87rem; line-height: 1.7; word-break: keep-all; }
+.livelihood-support-footer { flex-shrink: 0; padding: 14px 24px 20px; border-top: 1px solid #e8eef5; }
+.livelihood-support-footer button { width: 100%; min-height: 44px; padding: 10px; border: 0; border-radius: 10px; background: #005a9c; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.livelihood-support-dialog button:focus-visible, .livelihood-support-button:focus-visible { outline: 3px solid #4a96d1; outline-offset: 2px; }
+.livelihood-support-button { display: flex; align-items: center; justify-content: center; gap: 8px; width: calc(100% - 32px); margin: 0 16px 14px; padding: 10px; border: 1px solid #bad4e9; border-radius: 9px; background: #f0f7fd; color: #005a9c; font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.livelihood-support-button:hover { background: #e1effb; }
+@media (max-width: 767px) {
+    .livelihood-support-header { padding: 18px; }
+    .livelihood-support-header h2 { font-size: 1.1rem; }
+    .livelihood-support-body { padding: 16px; }
+    .livelihood-support-criterion { padding: 16px; }
+    .livelihood-support-footer { padding: 12px 16px 16px; }
+    .livelihood-support-button { width: calc(100% - 24px); margin-inline: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .livelihood-support-dialog.modal-content { animation: none; } }

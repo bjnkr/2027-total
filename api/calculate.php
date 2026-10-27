@@ -1,8 +1,8 @@
 <?php
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
 
-$common_path = './_common.php';
+$common_path = __DIR__.'/_common.php';
 if (!file_exists($common_path)) {
     die(json_encode(['success' => false, 'error' => "서버 에러: _common.php를 찾을 수 없습니다. 경로가 올바른지 확인해주세요. (확인된 상대경로: $common_path)"]));
 }
@@ -11,16 +11,25 @@ header('Content-Type: application/json; charset=utf-8');
 
 $input = file_get_contents("php://input");
 $data = json_decode($input, true);
-
-if (!$data) {
-    echo json_encode(['success' => false, 'error' => '잘못된 요청입니다.']);
+require_once __DIR__.'/_input.php';
+try {
+    $rawData = json_decode($input);
+    foreach (['earnedIncomes', 'privateTransferTwelveMonths', 'privateTransferTwelveMonthUnits'] as $field) {
+        if (is_object($rawData) && property_exists($rawData, $field) && !is_array($rawData->$field)) {
+            throw new InvalidArgumentException('목록으로 입력해야 하는 항목을 확인해 주세요: '.$field);
+        }
+    }
+    $data = normalizeCalculationInput($data);
+} catch (InvalidArgumentException $error) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => $error->getMessage()], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 // 1. DB 이력 저장 (UPSERT)
 if ($is_member) {
     $mb_id = $member['mb_id'];
-    $json_data = sql_real_escape_string($input);
+    $json_data = sql_real_escape_string(json_encode($data, JSON_UNESCAPED_UNICODE));
     $sql = " INSERT INTO bjn_calc_history (mb_id, input_data, created_at, updated_at) 
              VALUES ('{$mb_id}', '{$json_data}', NOW(), NOW()) 
              ON DUPLICATE KEY UPDATE input_data = '{$json_data}', updated_at = NOW() ";
@@ -88,197 +97,13 @@ function getMultiplier($unit) {
     return ($unit === 'manwon') ? 10000 : 1;
 }
 
-function calculateCommonIncome($data, $MEDIAN_INCOME, $isChasangwi = false, $forMedical = false) {
-    $householdSize = $data['householdSize'] ?? '1';
-    $medianIncome = $MEDIAN_INCOME[$householdSize] ?? 0;
-    
-    // 1-1. 근로/사업소득
-    $evaluatedEarnedIncome = 0;
-    foreach ($data['earnedIncomes'] as $income) {
-        $grossIncome = floatval($income['amount']) * getMultiplier($income['amountUnit']);
-        $pensionPaid = floatval($income['pension']) * getMultiplier($income['pensionUnit']);
-        if ($grossIncome <= 0) continue;
-        
-        $baseDeduction = 0;
-        $percentageRate = 0.3;
-        
-        switch ($income['type']) {
-            case 'youth': $baseDeduction = 600000; break;
-            case 'student': $baseDeduction = 600000; break;
-            case 'senior': 
-            case 'student_over_35':
-            case 'disabled': $baseDeduction = 200000; break;
-            case 'single_parent_youth': $baseDeduction = 600000; break;
-            case 'disabled_rehab': $baseDeduction = 200000; $percentageRate = 0.5; break;
-            default: 
-                $baseDeduction = 0; 
-                $percentageRate = $forMedical ? 0.0 : 0.3; 
-                break;
-        }
-
-        $remainingIncome = max(0, $grossIncome - $baseDeduction);
-        $percentageDeduction = $remainingIncome * $percentageRate;
-        $incomeDeduction = $baseDeduction + $percentageDeduction;
-        
-        $cappedIncomeDeduction = min($grossIncome, $incomeDeduction);
-        $incomeAfterEarnedDeduction = $grossIncome - $cappedIncomeDeduction;
-        $pensionDeductionApplied = $pensionPaid * 0.75;
-        
-        $evaluatedEarnedIncome += max(0, $incomeAfterEarnedDeduction - $pensionDeductionApplied);
-    }
-    
-    // 1-2. 사적 이전소득 (차상위계층확인/본인부담경감 에서는 반영 안함)
-    $evaluatedPrivateTransferIncome = 0;
-    if (!$isChasangwi) {
-        $privateType = $data['privateTransferType'] ?? 'same';
-        if ($privateType === 'same') {
-            $monthlyInput = floatval($data['privateTransferIncome']) * getMultiplier($data['inputUnits']['privateTransferIncome']);
-            $deductionVal = $medianIncome * 0.15;
-            $evaluatedPrivateTransferIncome = max(0, $monthlyInput - $deductionVal);
-        } else {
-            $calculatedSum = 0;
-            $validCount = 0;
-            $monthlyInputs = [];
-            for($i=0; $i<12; $i++) {
-                $val = floatval($data['privateTransferTwelveMonths'][$i] ?? 0);
-                $unit = $data['privateTransferTwelveMonthUnits'][$i] ?? 'manwon';
-                $input = $val * getMultiplier($unit);
-                if ($input > 0) $validCount++;
-                $calculated = max(0, $input - ($medianIncome * 0.15));
-                $calculatedSum += $calculated;
-            }
-            $isFrequent = $data['isFrequentPrivateTransfer'] || $validCount >= 6;
-            if ($isFrequent) {
-                $evaluatedPrivateTransferIncome = $calculatedSum / 12; // 정기
-            } else {
-                $threshold = $medianIncome * 0.5; // 비정기
-                if ($calculatedSum > $threshold) {
-                    $evaluatedPrivateTransferIncome = ($calculatedSum - $threshold) / 12;
-                } else {
-                    $evaluatedPrivateTransferIncome = 0;
-                }
-            }
-        }
-    }
-    
-    // 1-3. 공적 이전소득
-    $evaluatedPublicTransferIncome = floatval($data['publicTransferIncome']) * getMultiplier($data['inputUnits']['publicTransferIncome']);
-    
-    // 1-4. 재산소득 (임대소득, 이자소득)
-    $propertyRentalIncome = floatval($data['propertyRentalIncome'] ?? 0) * getMultiplier($data['inputUnits']['propertyRentalIncome'] ?? 'manwon');
-    
-    $propertyInterestInput = floatval($data['propertyInterestIncome'] ?? 0) * getMultiplier($data['inputUnits']['propertyInterestIncome'] ?? 'manwon');
-    $interestMonths = intval($data['propertyInterestMonths'] ?? 12);
-    
-    if ($interestMonths <= 12) {
-        $interestDeduction = 240000;
-    } else {
-        $interestDeduction = 20000 * $interestMonths;
-    }
-    $evaluatedInterestIncome = max(0, ($propertyInterestInput - $interestDeduction) / 12);
-    
-    $evaluatedPropertyIncome = $propertyRentalIncome + $evaluatedInterestIncome;
-    
-    // 1-5. 지출요인 공제
-    $expenditureDeduction = floatval($data['expenditureDeduction'] ?? 0) * getMultiplier($data['inputUnits']['expenditureDeduction'] ?? 'manwon');
-    
-    $totalIncome = $evaluatedEarnedIncome + $evaluatedPrivateTransferIncome + $evaluatedPublicTransferIncome + $evaluatedPropertyIncome - $expenditureDeduction;
-    
-    return max(0, $totalIncome);
-}
-
-function calculateProperty($data, $basicDeductionAmount) {
-    global $RESIDENTIAL_PROPERTY_LIMITS, $FINANCIAL_ASSET_DEDUCTION, $WORK_UNABLE_PROPERTY_LIMITS, $WORK_UNABLE_FINANCIAL_LIMITS;
-    
-    $region = $data['region'] ?? 'seoul';
-    $housingType = $data['housingType'] ?? 'jeonse';
-    
-    $residentialRaw = floatval($data['residentialProperty']) * getMultiplier($data['inputUnits']['residentialProperty']);
-    $adjustedResidential = ($housingType === 'jeonse') ? $residentialRaw * 0.95 : $residentialRaw;
-    
-    $generalRaw = floatval($data['generalProperty']) * getMultiplier($data['inputUnits']['generalProperty']);
-    $automobileRaw = floatval($data['automobileProperty']) * getMultiplier($data['inputUnits']['automobileProperty']);
-    $financialRaw = floatval($data['financialProperty']) * getMultiplier($data['inputUnits']['financialProperty']);
-    $debtRaw = floatval($data['debt']) * getMultiplier($data['inputUnits']['debt']);
-    
-    // 면제 차량 로직
-    $displacement = intval($data['automobileDisplacement']);
-    if ($data['automobileDisabilityType'] === 'severe' && $displacement < 2000) {
-        $automobileRaw = 0;
-    }
-    
-    // 근로무능력자 특례 (재산특례여부 '예'인 경우)
-    $isWorkUnablePropertyExempt = false;
-    if (!empty($data['hasPropertyException']) && $data['hasPropertyException'] === true) {
-        $propertyLimit = $WORK_UNABLE_PROPERTY_LIMITS[$region] ?? $WORK_UNABLE_PROPERTY_LIMITS['seoul'];
-        $financialLimit = $WORK_UNABLE_FINANCIAL_LIMITS[$region] ?? $WORK_UNABLE_FINANCIAL_LIMITS['seoul'];
-        $totalProperty = $adjustedResidential + $generalRaw + $automobileRaw + $financialRaw;
-        $netProperty = max(0, $totalProperty - $debtRaw);
-        $hasFullConversionAutomobile = false; // 현재 모든 자동차는 일반재산으로 평가되므로 100% 환산 자동차로 간주하지 않음
-        if ($netProperty <= $propertyLimit && $financialRaw <= $financialLimit && !$hasFullConversionAutomobile) {
-            $isWorkUnablePropertyExempt = true;
-        }
-    }
-    
-    if ($isWorkUnablePropertyExempt) {
-        return [
-            'residential' => 0,
-            'general' => 0,
-            'financial' => 0,
-            'isWorkUnablePropertyExempt' => true
-        ];
-    }
-    
-    $residentialLimit = $RESIDENTIAL_PROPERTY_LIMITS[$region] ?? $RESIDENTIAL_PROPERTY_LIMITS['seoul'];
-    $residentialForCalculation = min($adjustedResidential, $residentialLimit);
-    $residentialExcess = max(0, $adjustedResidential - $residentialLimit);
-    $totalGeneralProperty = $generalRaw + $automobileRaw + $residentialExcess;
-    
-    // 부채 전액을 먼저 주거용 → 일반 → 금융 재산에 배분합니다.
-    $remainingDebt = $debtRaw;
-    $residentialDebtUsed = min($residentialForCalculation, $remainingDebt);
-    $remainingDebt -= $residentialDebtUsed;
-    $generalDebtUsed = min($totalGeneralProperty, $remainingDebt);
-    $remainingDebt -= $generalDebtUsed;
-    $financialDebtUsed = min($financialRaw, $remainingDebt);
-    $remainingDebt -= $financialDebtUsed;
-
-    // 모든 재산의 부채 배분이 끝난 뒤 기본재산 공제를 배분합니다.
-    $remainingBasicDeduction = $basicDeductionAmount;
-    $residentialBasicUsed = min($residentialForCalculation - $residentialDebtUsed, $remainingBasicDeduction);
-    $remainingBasicDeduction -= $residentialBasicUsed;
-    $generalBasicUsed = min($totalGeneralProperty - $generalDebtUsed, $remainingBasicDeduction);
-    $remainingBasicDeduction -= $generalBasicUsed;
-    $financialBasicUsed = min($financialRaw - $financialDebtUsed, $remainingBasicDeduction);
-    $remainingBasicDeduction -= $financialBasicUsed;
-
-    $residentialDeduction = $residentialDebtUsed + $residentialBasicUsed;
-    $generalDeduction = $generalDebtUsed + $generalBasicUsed;
-    $financialDeduction = $financialDebtUsed + $financialBasicUsed;
-    $residentialAfterDeduction = $residentialForCalculation - $residentialDeduction;
-    $generalAfterDeduction = $totalGeneralProperty - $generalDeduction;
-    $financialAfterBasicAndDebt = $financialRaw - $financialDeduction;
-    $financialAfterDeduction = max(0, $financialAfterBasicAndDebt - $FINANCIAL_ASSET_DEDUCTION);
-    
-    return [
-        'residential' => $residentialAfterDeduction,
-        'general' => $generalAfterDeduction,
-        'financial' => $financialAfterDeduction
-    ];
-}
-
-// ---------------------------------------------
-// 1. 기초생활보장 계산
-// ---------------------------------------------
 function calcGicho($data, $MEDIAN_INCOME, $THRESHOLDS, $DEDUCTION_AMOUNTS) {
-    $income = calculateCommonIncome($data, $MEDIAN_INCOME, false, false);
-    $incomeMedical = calculateCommonIncome($data, $MEDIAN_INCOME, false, true);
-    $props = calculateProperty($data, $DEDUCTION_AMOUNTS[$data['region']]);
-    
-    $propConversion = ($props['residential'] * 0.0104) + ($props['general'] * 0.0417) + ($props['financial'] * 0.0626);
-    $totalIncome = round($income + $propConversion);
-    $totalIncomeMedical = round($incomeMedical + $propConversion);
-    
+    global $STANDARD_RENT;
+    $details = getCalculationDetails($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS[$data['region']], false, 0.0626, false);
+    $totalIncome = round($details['totalIncomeEvaluation'] + $details['totalPropertyConversion']);
+    $medicalDetails = getCalculationDetails($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS[$data['region']], false, 0.0626, true);
+    $totalIncomeMedical = round($medicalDetails['totalIncomeEvaluation'] + $medicalDetails['totalPropertyConversion']);
+
     $size = $data['householdSize'];
     $th = $THRESHOLDS[$size] ?? $THRESHOLDS['6'];
     
@@ -293,7 +118,6 @@ function calcGicho($data, $MEDIAN_INCOME, $THRESHOLDS, $DEDUCTION_AMOUNTS) {
     $housingType = $data['housingType'] ?? 'jeonse';
     if ($totalIncome <= $th['housing']) {
         if ($housingType === 'jeonse' || $housingType === 'wolse') {
-            global $STANDARD_RENT;
             $region = $data['region'] ?? 'seoul';
             $standardRent = $STANDARD_RENT[$region][$size] ?? $STANDARD_RENT[$region]['6'] ?? 0;
             
@@ -318,7 +142,9 @@ function calcGicho($data, $MEDIAN_INCOME, $THRESHOLDS, $DEDUCTION_AMOUNTS) {
     
     return [
         'income' => $totalIncome,
+        'details' => $details,
         'medicalIncome' => $totalIncomeMedical,
+        'medicalDetails' => $medicalDetails,
         'eligible' => $totalIncome <= $th['education'] || $totalIncomeMedical <= $th['medical'],
         'livelihoodEligible' => $totalIncome <= $th['livelihood'],
         'medicalEligible' => $totalIncomeMedical <= $th['medical'],
@@ -329,7 +155,8 @@ function calcGicho($data, $MEDIAN_INCOME, $THRESHOLDS, $DEDUCTION_AMOUNTS) {
         'thresholdHousing' => $th['housing'],
         'thresholdEducation' => $th['education'],
         'livelihoodBenefitAmount' => round($livelihoodBenefitAmount),
-        'housingBenefitAmount' => round($housingBenefitAmount)
+        'housingBenefitAmount' => round($housingBenefitAmount),
+        'standardRentByRegion' => array_map(function ($rents) use ($size) { return $rents[$size] ?? 0; }, $STANDARD_RENT)
     ];
 }
 
@@ -337,18 +164,15 @@ function calcGicho($data, $MEDIAN_INCOME, $THRESHOLDS, $DEDUCTION_AMOUNTS) {
 // 2. 한부모가족지원 계산
 // ---------------------------------------------
 function calcHanbumo($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS, $HANBUMO_THRESHOLDS) {
-    $income = calculateCommonIncome($data, $MEDIAN_INCOME, false);
-    $props = calculateProperty($data, $DEDUCTION_AMOUNTS[$data['region']]);
-    
-    // 한부모가족지원 환산율
-    $propConversion = ($props['residential'] * 0.0104) + ($props['general'] * 0.0417) + ($props['financial'] * 0.0626);
-    $totalIncome = round($income + $propConversion);
-    
+    $details = getCalculationDetails($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS[$data['region']], false, 0.0626, false);
+    $totalIncome = round($details['totalIncomeEvaluation'] + $details['totalPropertyConversion']);
+
     $size = $data['householdSize'];
     $threshold = $HANBUMO_THRESHOLDS[$size] ?? $HANBUMO_THRESHOLDS['6'];
     
     return [
         'income' => $totalIncome,
+        'details' => $details,
         'eligible' => $totalIncome <= $threshold,
         'threshold' => $threshold
     ];
@@ -358,17 +182,15 @@ function calcHanbumo($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS, $HANBUMO_THRESHO
 // 3. 차상위계층확인 계산
 // ---------------------------------------------
 function calcChasangwi($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS, $CHASANGWI_THRESHOLDS) {
-    $income = calculateCommonIncome($data, $MEDIAN_INCOME, true); // 사적이전소득 제외
-    $props = calculateProperty($data, $DEDUCTION_AMOUNTS[$data['region']]);
-    
-    $propConversion = ($props['residential'] * 0.0104) + ($props['general'] * 0.0417) + ($props['financial'] * 0.0417);
-    $totalIncome = round($income + $propConversion);
-    
+    $details = getCalculationDetails($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS[$data['region']], true, 0.0417, false);
+    $totalIncome = round($details['totalIncomeEvaluation'] + $details['totalPropertyConversion']);
+
     $size = $data['householdSize'];
     $threshold = $CHASANGWI_THRESHOLDS[$size] ?? $CHASANGWI_THRESHOLDS['6'];
     
     return [
         'income' => $totalIncome,
+        'details' => $details,
         'eligible' => $totalIncome <= $threshold,
         'threshold' => $threshold
     ];
@@ -378,19 +200,16 @@ function calcChasangwi($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS, $CHASANGWI_THR
 // 4. 차상위본인부담경감 계산
 // ---------------------------------------------
 function calcChasangwiMedical($data, $MEDIAN_INCOME, $MEDICAL_DEDUCTION_AMOUNTS, $CHASANGWI_THRESHOLDS) {
-    $income = calculateCommonIncome($data, $MEDIAN_INCOME, true, true); // 사적이전소득 제외, 의료급여 공제 룰(일반공제 0%) 적용
-    $props = calculateProperty($data, $MEDICAL_DEDUCTION_AMOUNTS[$data['region']]); // 오버라이드된 기본재산액 적용
-    
-    // 치명적 예외: 일반 재산 환산율 월 4.17% 적용 (기본 차상위는 금융 4.17%이나 본인부담경감은 금융 6.26% 적용)
-    $propConversion = ($props['residential'] * 0.0104) + ($props['general'] * 0.0417) + ($props['financial'] * 0.0626);
-    $totalIncome = round($income + $propConversion);
-    
+    $details = getCalculationDetails($data, $MEDIAN_INCOME, $MEDICAL_DEDUCTION_AMOUNTS[$data['region']], true, 0.0626, true);
+    $totalIncome = round($details['totalIncomeEvaluation'] + $details['totalPropertyConversion']);
+
     $size = $data['householdSize'];
     $median = $MEDIAN_INCOME[$size] ?? 0;
     $threshold = $median * 0.50; // 기준 중위소득 50%
     
     return [
         'income' => $totalIncome,
+        'details' => $details,
         'eligible' => $totalIncome <= $threshold
     ];
 }
@@ -668,17 +487,12 @@ function getCalculationDetails($data, $MEDIAN_INCOME, $basicDeductionAmount, $is
 
 // --- 최종 응답 패키징 ---
 $gicho = calcGicho($data, $MEDIAN_INCOME, $THRESHOLDS, $DEDUCTION_AMOUNTS);
-$gicho['details'] = getCalculationDetails($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS[$data['region']], false, 0.0626);
-$gicho['medicalDetails'] = getCalculationDetails($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS[$data['region']], false, 0.0626, true);
 
 $hanbumo = calcHanbumo($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS, $HANBUMO_THRESHOLDS);
-$hanbumo['details'] = getCalculationDetails($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS[$data['region']], false, 0.0626);
 
 $chasangwi = calcChasangwi($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS, $CHASANGWI_THRESHOLDS);
-$chasangwi['details'] = getCalculationDetails($data, $MEDIAN_INCOME, $DEDUCTION_AMOUNTS[$data['region']], true, 0.0417);
 
 $chasangwiMedical = calcChasangwiMedical($data, $MEDIAN_INCOME, $MEDICAL_DEDUCTION_AMOUNTS, $CHASANGWI_THRESHOLDS);
-$chasangwiMedical['details'] = getCalculationDetails($data, $MEDIAN_INCOME, $MEDICAL_DEDUCTION_AMOUNTS[$data['region']], true, 0.0626, true);
 
 echo json_encode([
     'success' => true,

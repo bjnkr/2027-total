@@ -11,53 +11,59 @@ import SingleParentCarWarningModal from './components/SingleParentCarWarningModa
 import { AlertModal } from './components/AlertModal';
 import HelpSidePanel from './components/HelpSidePanel';
 import { parseFormattedNumber } from './utils';
+import { normalizeFormState } from './normalizeFormState';
 import './index.css';
 
-export const MEDIAN_INCOME = {
-    '1': 2736042,
-    '2': 4480645,
-    '3': 5718091,
-    '4': 6929885,
-    '5': 8063019,
-    '6': 9129201,
-    '7': 10152665,
-    '8': 11176129,
-    '9': 12199593,
-    '10': 13223057
-};
+function StepIndicator({ currentStep }: { currentStep: number }) {
+    const steps = [
+        { id: 1, label: '기본 정보' },
+        { id: 2, label: '소득 정보' },
+        { id: 3, label: '자동차' },
+        { id: 4, label: '재산/부채' }
+    ];
 
-export const CHASANGWI_THRESHOLDS = {
-    '1': 1368021,
-    '2': 2240323,
-    '3': 2859046,
-    '4': 3464943,
-    '5': 4031510,
-    '6': 4564601,
-    '7': 5076333,
-    '8': 5588065,
-    '9': 6099797,
-    '10': 6611529,
-};
+    return (
+        <div className="step-indicator-wrapper">
+            <div className="step-progress-track">
+                <div
+                    className="step-progress-fill"
+                    style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
+                ></div>
+            </div>
+            <div className="step-items-container">
+                {steps.map(step => {
+                    const isCompleted = currentStep > step.id;
+                    const isActive = currentStep === step.id;
 
-export const HANBUMO_THRESHOLDS = {
-    // 2027년 기준중위소득 66%
-    '1': 1805788,
-    '2': 2957226,
-    '3': 3773940,
-    '4': 4573724,
-    '5': 5321593,
-    '6': 6025273,
-    '7': 6700759,
-    '8': 7376245,
-    '9': 8051731,
-    '10': 8727218,
-};
+                    return (
+                        <div key={step.id} className={`step-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}>
+                            <div className="step-circle">
+                                {isCompleted ? (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                ) : (
+                                    step.id
+                                )}
+                            </div>
+                            <div className="step-label">{step.label}</div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
 
 export default function App() {
     const [currentStep, setCurrentStep] = useState(1);
     const [helpPanelState, setHelpPanelState] = useState<{isOpen: boolean, topic: string | null}>({ isOpen: false, topic: null });
     const defaultHelpTopic = ['basic_info', 'basic_info', 'earned_income', 'automobile_business', 'property_debt'][currentStep] ?? 'basic_info';
     const [formData, setFormData] = useState<UnifiedFormState>(initialFormState);
+    const navigateToStep = (step: React.SetStateAction<number>) => {
+        setCurrentStep(step);
+        setHelpPanelState({ isOpen: false, topic: null });
+    };
     const [results, setResults] = useState<CalculationResults | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -69,9 +75,6 @@ export default function App() {
         setHelpPanelState({ isOpen: true, topic });
     };
 
-    useEffect(() => {
-        setHelpPanelState({ isOpen: false, topic: null });
-    }, [currentStep]);
     const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
     const [isCarWarningOpen, setIsCarWarningOpen] = useState(false);
     const [isSingleParentCarWarningOpen, setIsSingleParentCarWarningOpen] = useState(false);
@@ -80,18 +83,11 @@ export default function App() {
 
     useEffect(() => {
         // [API] 컴포넌트 마운트 시 이력 로드 (절대 경로 지정)
-        fetch('/calc/2027/api/get_history.php')
+        fetch(`${import.meta.env.BASE_URL}api/get_history.php`)
             .then(res => res.json())
             .then(data => {
                 if (data && data.success && data.input_data) {
-                    // JSON 이력에 저장된 boolean이 문자열("false")로 들어와도
-                    // JavaScript의 truthy 값으로 잘못 해석되지 않도록 정규화한다.
-                    const savedData = data.input_data;
-                    setFormData({
-                        ...initialFormState,
-                        ...savedData,
-                        isMultiChildHousehold: savedData.isMultiChildHousehold === true || savedData.isMultiChildHousehold === 'true',
-                    });
+                    setFormData(normalizeFormState(data.input_data));
                 }
             })
             .catch(err => console.error('Failed to load history:', err))
@@ -123,7 +119,7 @@ export default function App() {
 
             if (!hasDisplacement && !hasRegistrationDate && !hasProperty) {
                 // No car entered
-                setCurrentStep(prev => prev + 1);
+                navigateToStep(prev => prev + 1);
                 return;
             }
 
@@ -197,7 +193,7 @@ export default function App() {
             }
         }
 
-        setCurrentStep(prev => prev + 1);
+        navigateToStep(prev => prev + 1);
     };
 
     const handleIncomeModalSubmit = (members: { ageGroup: string }[]) => {
@@ -223,14 +219,14 @@ export default function App() {
             ...prev,
             earnedIncomes: newEarnedIncomes
         }));
-        setCurrentStep(2);
+        navigateToStep(2);
     };
 
     const handlePrev = () => {
         const now = Date.now();
         if (now - lastActionTime.current < 400) return;
         lastActionTime.current = now;
-        setCurrentStep(prev => prev - 1);
+        navigateToStep(prev => prev - 1);
     };
 
     const handleCalculate = async (e?: React.MouseEvent | React.FormEvent) => {
@@ -241,7 +237,7 @@ export default function App() {
 
         try {
             // [API] 통합 계산 및 이력 저장 API 호출 (절대 경로 지정)
-            const response = await fetch('/calc/2027/api/calculate.php', {
+            const response = await fetch(`${import.meta.env.BASE_URL}api/calculate.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
@@ -251,7 +247,7 @@ export default function App() {
             let data: CalculationResults;
             try {
                 data = JSON.parse(text);
-            } catch (parseErr) {
+            } catch {
                 console.error('JSON Parse Error. Raw response:', text);
                 setAlertMessage(`서버 응답 오류 (JSON 파싱 실패):\n${text.substring(0, 100)}...`);
                 return;
@@ -259,67 +255,26 @@ export default function App() {
 
             if (data.success) {
                 setResults(data);
-                setCurrentStep(5);
+                navigateToStep(5);
             } else {
                 setAlertMessage(data.error || '계산 중 오류가 발생했습니다.');
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Calculation error:', err);
-            alert(`서버와 통신 중 오류가 발생했습니다.\n상세: ${err.message}`);
+            alert(`서버와 통신 중 오류가 발생했습니다.\n상세: ${err instanceof Error ? err.message : String(err)}`);
         }
     };
 
     if (loading) return <div>로딩 중...</div>;
-
-    const StepIndicator = () => {
-        const steps = [
-            { id: 1, label: '기본 정보' },
-            { id: 2, label: '소득 정보' },
-            { id: 3, label: '자동차' },
-            { id: 4, label: '재산/부채' }
-        ];
-
-        return (
-            <div className="step-indicator-wrapper">
-                <div className="step-progress-track">
-                    <div 
-                        className="step-progress-fill" 
-                        style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
-                    ></div>
-                </div>
-                <div className="step-items-container">
-                    {steps.map(step => {
-                        const isCompleted = currentStep > step.id;
-                        const isActive = currentStep === step.id;
-                        
-                        return (
-                            <div key={step.id} className={`step-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}>
-                                <div className="step-circle">
-                                    {isCompleted ? (
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                            <polyline points="20 6 9 17 4 12"></polyline>
-                                        </svg>
-                                    ) : (
-                                        step.id
-                                    )}
-                                </div>
-                                <div className="step-label">{step.label}</div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        );
-    };
 
     return (
         <div className="calculator-layout">
             <div className="container-wrapper">
             <div className="container">
             <div className="top-header">
-                <div className="brand-logo">
+                <a className="brand-logo" href="https://bjn.kr" target="_self" aria-label="복지N 홈으로 이동">
                     <img src="https://bjn.kr/img_bjn/logo2.png" className="logo-icon" alt="복지N 로고" style={{height: '40px', borderRadius: '6px'}} />
-                </div>
+                </a>
                 <nav className="top-menu" aria-label="기준표 메뉴">
                     <button type="button" onClick={() => openHelpPanel('major_criteria')}>주요기준</button>
                 </nav>
@@ -335,7 +290,7 @@ export default function App() {
             {currentStep < 5 && (
             <>
             <form onSubmit={handleCalculate}>
-                <StepIndicator />
+                <StepIndicator currentStep={currentStep} />
 
                 {currentStep === 1 && <Step1BasicInfo formData={formData} setFormData={setFormData} setAlertMessage={setAlertMessage} openHelpPanel={openHelpPanel} />}
                 {currentStep === 2 && <Step2IncomeInfo formData={formData} setFormData={setFormData} setAlertMessage={setAlertMessage} openHelpPanel={openHelpPanel} />}
@@ -364,19 +319,19 @@ export default function App() {
                     isSingleParentOnlyMode={isSingleParentOnlyMode}
                     onReset={() => {
                         setFormData(initialFormState);
-                        setCurrentStep(1);
+                        navigateToStep(1);
                         setResults(null);
                     }} 
-                    onNavigate={(step: number) => setCurrentStep(step)} 
+                    onNavigate={(step: number) => navigateToStep(step)}
                 />
             )} 
 
-            <EarnedIncomeModal 
+            {isIncomeModalOpen && <EarnedIncomeModal
                 isOpen={isIncomeModalOpen} 
                 householdSize={parseInt(formData.householdSize, 10)}
                 onClose={() => setIsIncomeModalOpen(false)} 
                 onSubmit={handleIncomeModalSubmit} 
-            />
+            />}
             {isCarWarningOpen && (
                 <CarWarningModal onClose={() => setIsCarWarningOpen(false)} />
             )}
@@ -386,7 +341,7 @@ export default function App() {
                     onProceed={() => {
                         setIsSingleParentCarWarningOpen(false);
                         setIsSingleParentOnlyMode(true);
-                        setCurrentStep(4);
+                        navigateToStep(4);
                     }}
                 />
             )}

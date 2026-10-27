@@ -1,6 +1,10 @@
-import React from 'react';
+import HelpButton from './HelpButton';
+import React, { useState } from 'react';
 import type { UnifiedFormState } from '../types';
 import { formatNumberWithCommas, parseFormattedNumber } from '../utils';
+import InterestIncomeInputModal from './InterestIncomeInputModal';
+import PrivateTransferInputModal from './PrivateTransferInputModal';
+import CalculationIcon from './CalculationIcon';
 
 interface Props {
     formData: UnifiedFormState;
@@ -10,6 +14,11 @@ interface Props {
 }
 
 export default function Step2IncomeInfo({ formData, setFormData, openHelpPanel }: Props) {
+    const [showInterestInput, setShowInterestInput] = useState(false);
+    const [showPrivateTransferInput, setShowPrivateTransferInput] = useState(false);
+    const receivedMonths = formData.privateTransferTwelveMonths.filter(value => Number(value) > 0).length;
+    const monthlySupportTotal = formData.privateTransferTwelveMonths.reduce((sum, value, i) => sum + Number(value || '0') * (formData.privateTransferTwelveMonthUnits[i] === 'won' ? 1 : 10000), 0);
+    const hasMonthlySupportInput = formData.privateTransferTwelveMonths.some(value => value !== '') || formData.isFrequentPrivateTransfer;
     const handleEarnedIncomeChange = (id: number, field: 'amount' | 'type' | 'pension', value: string) => {
         const processedValue = (field === 'amount' || field === 'pension') ? parseFormattedNumber(value) : value;
         setFormData(prev => ({
@@ -41,34 +50,6 @@ export default function Step2IncomeInfo({ formData, setFormData, openHelpPanel }
             }
         }));
     };
-
-    const handlePrivateTransferTwelveMonthChange = (index: number, value: string) => {
-        setFormData(prev => {
-            const newMonths = [...prev.privateTransferTwelveMonths];
-            newMonths[index] = parseFormattedNumber(value);
-            
-            const validCount = newMonths.filter(m => {
-                const num = parseFloat(m);
-                return !isNaN(num) && num > 0;
-            }).length;
-
-            return { 
-                ...prev, 
-                privateTransferTwelveMonths: newMonths,
-                isFrequentPrivateTransfer: validCount >= 6 ? true : prev.isFrequentPrivateTransfer
-            };
-        });
-    };
-
-    const handlePrivateTransferMonthUnitChange = (index: number) => {
-        setFormData(prev => {
-            const newUnits = [...prev.privateTransferTwelveMonthUnits];
-            newUnits[index] = newUnits[index] === 'manwon' ? 'won' : 'manwon';
-            return { ...prev, privateTransferTwelveMonthUnits: newUnits };
-        });
-    };
-
-    const monthLabels = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
 
     const getAgeLabel = (ageGroup?: string) => {
         if (ageGroup === '34_or_less') return '34세 이하';
@@ -116,20 +97,20 @@ export default function Step2IncomeInfo({ formData, setFormData, openHelpPanel }
     };
 
     return (
-        <div className="step-content">
+        <div className="step-content income-input-step">
             <div className="income-section">
                 <div className="step-header">
                     <h2 className="step-section-title">2. 소득정보</h2>
                     <div className="unit-change-badge">
                         <span className="desktop-unit-text">금액 단위 변경 : 입력 칸 <span className="highlight-green">만원</span> 클릭</span>
-                        <span className="mobile-unit-text">단위변경 :<br /> <span className="highlight-green">만원</span>클릭</span>
+                        <span className="mobile-unit-text">단위변경 : <span className="highlight-green">만원</span> 클릭</span>
                     </div>
                 </div>
                 <div className="income-category">
                     <div className="income-title-wrapper">
                         <h5 style={{ display: 'flex', alignItems: 'center' }}>
                             (가) 근로/사업 소득 
-                            <button type="button" className="help-btn" onClick={() => openHelpPanel && openHelpPanel('earned_income')} aria-label="도움말">?</button>
+                            <HelpButton label="설명 보기" subject="근로/사업 소득" onClick={() => openHelpPanel?.('earned_income')} />
                         </h5>
                     </div>
                     {formData.earnedIncomes.map((income, index) => (
@@ -195,12 +176,12 @@ export default function Step2IncomeInfo({ formData, setFormData, openHelpPanel }
                     <div className="income-title-wrapper">
                         <h5 style={{ display: 'flex', alignItems: 'center' }}>
                             (나) 사적 이전소득
-                            <button type="button" className="help-btn" onClick={() => openHelpPanel && openHelpPanel('private_transfer')} aria-label="도움말">?</button>
+                            <HelpButton label="설명 보기" subject="사적 이전소득" onClick={() => openHelpPanel?.('private_transfer')} />
                         </h5>
                     </div>
                     <div className="form-group">
                         <label>지원금액 유형</label>
-                        <div className="radio-group-box">
+                        <div className="radio-group-box private-support-options">
                             <div className="radio-option">
                                 <input
                                     type="radio"
@@ -219,7 +200,7 @@ export default function Step2IncomeInfo({ formData, setFormData, openHelpPanel }
                                     name="privateTransferType"
                                     value="different"
                                     checked={formData.privateTransferType === 'different'}
-                                    onChange={() => setFormData(prev => ({ ...prev, privateTransferType: 'different' }))}
+                                    onChange={() => { setFormData(prev => ({ ...prev, privateTransferType: 'different' })); setShowPrivateTransferInput(true); }}
                                 />
                                 <label htmlFor="privateTransferDifferent">매월 다른 금액 지원</label>
                             </div>
@@ -245,64 +226,22 @@ export default function Step2IncomeInfo({ formData, setFormData, openHelpPanel }
                             </div>
                         </div>
                     )}
-                    {formData.privateTransferType === 'different' && (
-                        <>
-                            <div className="form-group">
-                                <div className="checkbox-group-box">
-                                    <label>지원 횟수 (선택)</label>
-                                    <div className="checkbox-option">
-                                        <input
-                                            type="checkbox"
-                                            id="isFrequentPrivateTransfer"
-                                            checked={formData.isFrequentPrivateTransfer}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, isFrequentPrivateTransfer: e.target.checked }))}
-                                        />
-                                        <label htmlFor="isFrequentPrivateTransfer">6회 이상 (정기 지원)</label>
-                                        <span className="checkbox-description">
-                                            (입력한 개월 수와 무관하게, 최근 1년간 실제 지원(입금)받은 총 횟수가 6회 이상인 경우 선택하세요.)
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="form-group monthly-grid-group">
-                                <label>월별 지원 금액</label>
-                                <p className="description">
-                                    실제 지원받은 월의 금액을 입력하세요. 입력하지 않은 월은 0원으로 처리됩니다.
-                                </p>
-                                <div className="twelve-month-grid">
-                                    {formData.privateTransferTwelveMonths.map((value, index) => (
-                                        <div className="form-group month-input-group" key={index}>
-                                            <label htmlFor={`privateTransferMonth-${index + 1}`}>{monthLabels[index]}</label>
-                                            <div className="input-wrapper">
-                                                <input
-                                                    type="text"
-                                                    inputMode="numeric"
-                                                    id={`privateTransferMonth-${index + 1}`}
-                                                    value={formatNumberWithCommas(value)}
-                                                    onChange={e => handlePrivateTransferTwelveMonthChange(index, e.target.value)}
-                                                    onWheel={(e) => (e.target as HTMLElement).blur()}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    className="unit-display"
-                                                    onClick={() => handlePrivateTransferMonthUnitChange(index)}
-                                                >
-                                                    {formData.privateTransferTwelveMonthUnits[index] === 'manwon' ? '만원' : '원'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </>
-                    )}
+                    {formData.privateTransferType === 'different' && <div className="interest-entry-card private-transfer-entry-card">
+                        <div className="interest-entry-heading"><CalculationIcon name="gift" /><strong>월별 지원금액</strong></div>
+                        {hasMonthlySupportInput ? <dl className="interest-entry-values">
+                            <div><dt>지원받은 월</dt><dd>{receivedMonths}개월</dd></div>
+                            <div><dt>입력 금액 합계</dt><dd>{monthlySupportTotal.toLocaleString('ko-KR')}원</dd></div>
+                            <div className="private-transfer-summary-type"><dt>지원 유형</dt><dd>{formData.isFrequentPrivateTransfer || receivedMonths >= 6 ? '정기 지원 (6회 이상)' : '비정기 지원'}</dd></div>
+                        </dl> : <p className="interest-entry-empty">지원받은 월의 금액과 지원 횟수를 입력해 주세요.</p>}
+                        <button type="button" className="interest-entry-button" onClick={() => setShowPrivateTransferInput(true)}>{hasMonthlySupportInput ? '입력 내용 수정' : '월별 지원금액 입력'}</button>
+                    </div>}
                 </div>
                 
                 <div className="income-category">
                     <div className="income-title-wrapper">
                         <h5 style={{ display: 'flex', alignItems: 'center' }}>
                             (다) 공적 이전소득
-                            <button type="button" className="help-btn" onClick={() => openHelpPanel && openHelpPanel('public_transfer')} aria-label="도움말">?</button>
+                            <HelpButton label="설명 보기" subject="공적 이전소득" onClick={() => openHelpPanel?.('public_transfer')} />
                         </h5>
                     </div>
                     <div className="form-group">
@@ -327,7 +266,7 @@ export default function Step2IncomeInfo({ formData, setFormData, openHelpPanel }
                     <div className="income-title-wrapper">
                         <h5 style={{ display: 'flex', alignItems: 'center' }}>
                             (라) 재산소득
-                            <button type="button" className="help-btn" onClick={() => openHelpPanel && openHelpPanel('property_income')} aria-label="도움말">?</button>
+                            <HelpButton label="설명 보기" subject="재산소득" onClick={() => openHelpPanel?.('property_income')} />
                         </h5>
                     </div>
                     
@@ -350,38 +289,13 @@ export default function Step2IncomeInfo({ formData, setFormData, openHelpPanel }
                     </div>
 
                     {/* 이자소득 */}
-                    <div className="form-grid" style={{ alignItems: 'end' }}>
-                        <div className="form-group">
-                            <label htmlFor="propertyInterestIncome">이자소득 <span style={{fontSize: '0.85rem', color: '#64748b', fontWeight: 'normal'}}>(2026년에 받은 금액)</span></label>
-                            <div className="input-wrapper">
-                                <input 
-                                    type="text" 
-                                    inputMode="numeric"
-                                    id="propertyInterestIncome"
-                                    value={formatNumberWithCommas(formData.propertyInterestIncome)}
-                                    onChange={e => setFormData(prev => ({ ...prev, propertyInterestIncome: parseFormattedNumber(e.target.value) }))}
-                                    onWheel={(e) => (e.target as HTMLElement).blur()}
-                                />
-                                <button type="button" className="unit-toggle" onClick={() => handleUnitChange('propertyInterestIncome')}>
-                                    {formData.inputUnits.propertyInterestIncome === 'manwon' ? '만원' : '원'}
-                                </button>
-                            </div>
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="propertyInterestMonths">가입기간 ( 이자소득 )</label>
-                            <div className="input-wrapper">
-                                <input 
-                                    type="number" 
-                                    inputMode="numeric"
-                                    id="propertyInterestMonths"
-                                    value={formData.propertyInterestMonths}
-                                    onChange={e => setFormData(prev => ({ ...prev, propertyInterestMonths: e.target.value }))}
-                                    onWheel={(e) => (e.target as HTMLElement).blur()}
-                                    min="0"
-                                />
-                                <span style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }}>개월</span>
-                            </div>
-                        </div>
+                    <div className="interest-entry-card">
+                        <div className="interest-entry-heading"><CalculationIcon name="interest" /><strong>이자소득</strong><span>2026년에 받은 금액</span></div>
+                        {formData.propertyInterestIncome !== '' || formData.propertyInterestMonths !== '' ? <dl className="interest-entry-values">
+                            <div><dt>이자소득 총액</dt><dd>{(Number(parseFormattedNumber(formData.propertyInterestIncome || '0')) * (formData.inputUnits.propertyInterestIncome === 'manwon' ? 10000 : 1)).toLocaleString('ko-KR')}원</dd></div>
+                            <div><dt>가입기간</dt><dd>{formData.propertyInterestMonths ? `${formData.propertyInterestMonths}개월` : '미입력'}</dd></div>
+                        </dl> : <p className="interest-entry-empty">받은 이자소득 총액과 가입기간을 함께 입력해 주세요.</p>}
+                        <button type="button" className="interest-entry-button" onClick={() => setShowInterestInput(true)}>{formData.propertyInterestIncome !== '' || formData.propertyInterestMonths !== '' ? '입력 내용 수정' : '이자소득 · 가입기간 입력'}</button>
                     </div>
                 </div>
 
@@ -389,7 +303,7 @@ export default function Step2IncomeInfo({ formData, setFormData, openHelpPanel }
                     <div className="income-title-wrapper">
                         <h5 style={{ display: 'flex', alignItems: 'center' }}>
                             (마) 지출요인 공제
-                            <button type="button" className="help-btn" onClick={() => openHelpPanel && openHelpPanel('expenditure_deduction')} aria-label="도움말">?</button>
+                            <HelpButton label="설명 보기" subject="지출비용 공제" onClick={() => openHelpPanel?.('expenditure_deduction')} />
                         </h5>
                     </div>
                     <div className="form-group">
@@ -410,6 +324,28 @@ export default function Step2IncomeInfo({ formData, setFormData, openHelpPanel }
                     </div>
                 </div>
             </div>
+            {showPrivateTransferInput && <PrivateTransferInputModal
+                amounts={formData.privateTransferTwelveMonths}
+                units={formData.privateTransferTwelveMonthUnits}
+                frequent={formData.isFrequentPrivateTransfer}
+                onClose={() => setShowPrivateTransferInput(false)}
+                onSave={({ amounts, units, frequent }) => {
+                    setFormData(previous => ({ ...previous, privateTransferTwelveMonths: amounts,
+                        privateTransferTwelveMonthUnits: units, isFrequentPrivateTransfer: frequent }));
+                    setShowPrivateTransferInput(false);
+                }}
+            />}
+            {showInterestInput && <InterestIncomeInputModal
+                amount={formData.propertyInterestIncome}
+                unit={formData.inputUnits.propertyInterestIncome ?? 'manwon'}
+                months={formData.propertyInterestMonths}
+                onClose={() => setShowInterestInput(false)}
+                onSave={({ amount, unit, months }) => {
+                    setFormData(previous => ({ ...previous, propertyInterestIncome: amount, propertyInterestMonths: months,
+                        inputUnits: { ...previous.inputUnits, propertyInterestIncome: unit } }));
+                    setShowInterestInput(false);
+                }}
+            />}
         </div>
     );
 }

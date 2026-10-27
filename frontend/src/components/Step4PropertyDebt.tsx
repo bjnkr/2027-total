@@ -1,3 +1,4 @@
+import HelpButton from './HelpButton';
 import React, { useMemo } from 'react';
 import type { UnifiedFormState } from '../types';
 import { formatNumberWithCommas, parseFormattedNumber } from '../utils';
@@ -23,7 +24,7 @@ export default function Step4PropertyDebt({ formData, setFormData, openHelpPanel
     const residentialPropertyUI = useMemo(() => {
         switch (formData.housingType) {
             case 'owned': return { label: '공시지가', description: '거주 중인 주택, 아파트 등의 공시지가' };
-            case 'jeonse': return { label: '전세 보증금', description: '전세 보증금 금액' };
+            case 'jeonse': return { label: '전세(월세) 보증금', description: '전세(월세) 보증금 금액' };
             case 'wolse': return { label: '월세 보증금', description: '월세 보증금 금액' };
             case 'free': return { label: '주거용 재산', description: '무료임차 시 해당 사항 없음 (0원 입력)' };
             default: return { label: '주거용 재산', description: '거주 중인 주택, 아파트 등의 공시지가' };
@@ -36,30 +37,35 @@ export default function Step4PropertyDebt({ formData, setFormData, openHelpPanel
                 <div className="step-header">
                     <h2 className="step-section-title" style={{ display: 'flex', alignItems: 'center' }}>
                         4. 재산 / 부채
-                        <button type="button" className="help-btn" onClick={() => openHelpPanel && openHelpPanel('property_debt')} aria-label="도움말">?</button>
+                        <HelpButton label="입력 도움말" subject="재산 / 부채" onClick={() => openHelpPanel?.('property_debt')} />
                     </h2>
                     <div className="unit-change-badge">
                         <span className="desktop-unit-text">금액 단위 변경 : 입력 칸 <span className="highlight-green">만원</span> 클릭</span>
-                        <span className="mobile-unit-text">단위변경 :<br /> <span className="highlight-green">만원</span>클릭</span>
+                        <span className="mobile-unit-text">단위변경 : <span className="highlight-green">만원</span> 클릭</span>
                     </div>
                 </div>
                 <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: '1.5rem' }}></div>
                 <div className="form-grid">
-                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                        <label htmlFor="region" className="flex-label">
+                    <fieldset className="form-group region-field" style={{ gridColumn: '1 / -1' }}>
+                        <legend className="flex-label">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="label-icon">
                                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                                 <circle cx="12" cy="10" r="3"></circle>
                             </svg>
                             거주 지역
-                        </label>
-                        <select id="region" name="region" value={formData.region} onChange={e => setFormData(prev => ({ ...prev, region: e.target.value }))}>
-                            <option value="seoul">서울</option>
-                            <option value="gyeonggi">경기</option>
-                            <option value="metro">광역·세종·창원</option>
-                            <option value="other">그 외 지역</option>
-                        </select>
-                    </div>
+                        </legend>
+                        <div id="region" className="region-options">
+                            {[
+                                { value: 'seoul', label: '서울' },
+                                { value: 'gyeonggi', label: '경기' },
+                                { value: 'metro', label: '광역·세종·창원' },
+                                { value: 'other', label: '그 외 지역' },
+                            ].map(region => <label className="region-option" key={region.value}>
+                                <input type="radio" name="region" value={region.value} checked={formData.region === region.value} onChange={() => setFormData(previous => ({ ...previous, region: region.value }))} />
+                                <span>{region.label}</span>
+                            </label>)}
+                        </div>
+                    </fieldset>
                     <div className="form-group">
                         <label className="flex-label">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
@@ -127,8 +133,7 @@ export default function Step4PropertyDebt({ formData, setFormData, openHelpPanel
                     <div className="form-group">
                         <label htmlFor="financialProperty" className="flex-label">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="label-icon">
-                                <line x1="12" y1="1" x2="12" y2="23"></line>
-                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                <path d="m3 5 4 14 5-14 5 14 4-14M2 10h20M2 14h20"></path>
                             </svg>
                             금융 재산
                         </label>

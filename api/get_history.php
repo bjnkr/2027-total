@@ -1,5 +1,5 @@
 <?php
-include_once('./_common.php');
+include_once(__DIR__.'/_common.php');
 header('Content-Type: application/json; charset=utf-8');
 
 if (!$is_member) {

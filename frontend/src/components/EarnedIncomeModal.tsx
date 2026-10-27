@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { AlertModal } from './AlertModal';
+import { useEffect, useRef, useState } from 'react';
+import CalculationIcon from './CalculationIcon';
+import './EarnedIncomeModal.css';
 
 interface Props {
     isOpen: boolean;
@@ -8,140 +9,96 @@ interface Props {
     onSubmit: (members: { ageGroup: string }[]) => void;
 }
 
+const ageOptions = [
+    { value: '34_or_less', label: '34세 이하' },
+    { value: '35_to_64', label: '35세 - 64세' },
+    { value: '65_or_more', label: '65세 이상' },
+];
+
+function SelectionMark({ selected }: { selected: boolean }) {
+    return <span className={`earned-selection-mark${selected ? ' is-selected' : ''}`} aria-hidden="true">{selected && <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="m3 8 3 3 7-7" /></svg>}</span>;
+}
+
 export default function EarnedIncomeModal({ isOpen, householdSize, onClose, onSubmit }: Props) {
-    const [memberCount, setMemberCount] = useState<number>(0);
+    const dialogRef = useRef<HTMLDialogElement>(null);
+    const [memberCount, setMemberCount] = useState(1);
     const [ages, setAges] = useState<string[]>([]);
-    const [step, setStep] = useState<number>(1);
+    const [step, setStep] = useState(1);
     const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
-    // 모달이 열릴 때 기본값을 1명으로 설정
     useEffect(() => {
-        if (isOpen) {
-            setMemberCount(1);
-            setStep(1);
-        }
-    }, [isOpen, householdSize]);
+        if (!isOpen) return;
+        const dialog = dialogRef.current;
+        const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const previousOverflow = document.body.style.overflow;
+        dialog?.showModal();
+        document.body.style.overflow = 'hidden';
+        return () => {
+            dialog?.close();
+            document.body.style.overflow = previousOverflow;
+            previousFocus?.focus({ preventScroll: true });
+        };
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
     const handleCountSubmit = () => {
-        if (memberCount < 0) return;
-        if (memberCount === 0) {
-            onSubmit([]);
-            return;
-        }
+        if (memberCount === 0) return onSubmit([]);
         setAges(Array(memberCount).fill(''));
+        setAlertMessage(null);
         setStep(2);
     };
-
     const handleAgeSubmit = () => {
         if (ages.some(age => age === '')) {
-            setAlertMessage('가구원의 나이를 선택해 주세요');
+            setAlertMessage('소득이 있는 가구원의 나이를 모두 선택해 주세요.');
             return;
         }
-        onSubmit(ages.map(age => ({ ageGroup: age })));
+        onSubmit(ages.map(ageGroup => ({ ageGroup })));
     };
 
-    const handleAgeChange = (index: number, value: string) => {
-        const newAges = [...ages];
-        newAges[index] = value;
-        setAges(newAges);
-    };
-
-    return (
-        <div className="modal-overlay" style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', zIndex: 1000
-        }}>
-            <div className="modal-content" style={{
-                backgroundColor: 'white', padding: '24px', borderRadius: '8px',
-                width: '400px', maxWidth: '90vw', boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-            }}>
-                {step === 1 ? (
-                    <>
-                        <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.25rem', fontWeight: 600, color: '#1e293b' }}>근로소득(사업소득)이 있는 가구원 확인</h3>
-                        <div className="form-group">
-                            <label style={{ display: 'block', marginBottom: '12px', color: '#475569' }}>
-                                근로소득 (사업소득)이 있는 가구원은 몇 명인가요?
-                            </label>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                {Array.from({ length: householdSize + 1 }, (_, i) => (
-                                    <button
-                                        key={i}
-                                        type="button"
-                                        onClick={() => setMemberCount(i)}
-                                        style={{
-                                            padding: '8px 16px',
-                                            borderRadius: '6px',
-                                            border: memberCount === i ? '2px solid #3b82f6' : '1px solid #cbd5e1',
-                                            backgroundColor: memberCount === i ? '#eff6ff' : 'white',
-                                            color: memberCount === i ? '#1d4ed8' : '#475569',
-                                            cursor: 'pointer',
-                                            fontWeight: memberCount === i ? 600 : 400,
-                                            flex: '1 0 calc(33% - 8px)',
-                                            minWidth: '60px'
-                                        }}
-                                    >
-                                        {i === 0 ? '없음' : `${i}명`}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px' }}>
-                            <button type="button" onClick={onClose} style={{ padding: '8px 16px', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: 'white', cursor: 'pointer' }}>취소</button>
-                            <button type="button" onClick={handleCountSubmit} style={{ padding: '8px 16px', border: 'none', borderRadius: '4px', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer' }}>다음</button>
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.25rem', fontWeight: 600, color: '#1e293b' }}>근로소득(사업소득)이 있는 가구원 나이 선택</h3>
-                        <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '8px' }}>
-                            {ages.map((age, index) => (
-                                <div key={index} className="form-group" style={{ marginBottom: '20px' }}>
-                                    <label style={{ display: 'block', marginBottom: '8px', color: '#475569', fontWeight: 500 }}>
-                                        가구원 {index + 1} 나이 선택
-                                    </label>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                        {[
-                                            { value: '34_or_less', label: '34세 이하' },
-                                            { value: '35_to_64', label: '35세 - 64세' },
-                                            { value: '65_or_more', label: '65세 이상' }
-                                        ].map(option => (
-                                            <button
-                                                key={option.value}
-                                                type="button"
-                                                onClick={() => handleAgeChange(index, option.value)}
-                                                style={{
-                                                    padding: '8px 12px',
-                                                    borderRadius: '6px',
-                                                    border: age === option.value ? '2px solid #3b82f6' : '1px solid #cbd5e1',
-                                                    backgroundColor: age === option.value ? '#eff6ff' : 'white',
-                                                    color: age === option.value ? '#1d4ed8' : '#475569',
-                                                    cursor: 'pointer',
-                                                    fontWeight: age === option.value ? 600 : 400,
-                                                    flex: '1 0 calc(33.333% - 6px)',
-                                                    minWidth: '80px',
-                                                    fontSize: '0.9rem'
-                                                }}
-                                            >
-                                                {option.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px' }}>
-                            <button type="button" onClick={() => setStep(1)} style={{ padding: '8px 16px', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: 'white', cursor: 'pointer' }}>이전</button>
-                            <button type="button" onClick={handleAgeSubmit} style={{ padding: '8px 16px', border: 'none', borderRadius: '4px', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer' }}>완료</button>
-                        </div>
-                    </>
-                )}
+    return <dialog ref={dialogRef} className="modal-content earned-income-dialog" aria-labelledby="earned-income-title" aria-describedby="earned-income-description" onCancel={event => { event.preventDefault(); onClose(); }}>
+        <header className="earned-income-header">
+            <div className="earned-income-heading-row">
+                <span className="earned-income-heading-icon"><CalculationIcon name="income" /></span>
+                <span className="earned-income-eyebrow">소득 정보 입력 준비</span>
+                <button type="button" className="earned-income-close" onClick={onClose} aria-label="가구원 확인 닫기">×</button>
             </div>
-            {alertMessage && (
-                <AlertModal message={alertMessage} onClose={() => setAlertMessage(null)} />
-            )}
+            <h2 id="earned-income-title">{step === 1 ? '소득이 있는 가구원은 몇 명인가요?' : '가구원의 나이를 선택해 주세요'}</h2>
+            <p id="earned-income-description">{step === 1 ? '근로소득 또는 사업소득이 있는 가구원 수를 선택해 주세요.' : '선택한 나이에 맞는 소득공제 기준을 적용합니다.'}</p>
+            <ol className="earned-income-progress" aria-label="가구원 확인 진행 단계">
+                <li className={step === 1 ? 'is-current' : 'is-complete'} aria-current={step === 1 ? 'step' : undefined}><span>1</span>가구원 수</li>
+                <li className={step === 2 ? 'is-current' : ''} aria-current={step === 2 ? 'step' : undefined}><span>2</span>나이 선택</li>
+            </ol>
+        </header>
+        <div className="earned-income-body">
+            {step === 1 ? <>
+                <div className="earned-income-field-heading"><h3>소득이 있는 가구원 수</h3><span>전체 {householdSize}인 가구</span></div>
+                <div className="earned-count-options" role="group" aria-label="소득이 있는 가구원 수">
+                    {Array.from({ length: householdSize + 1 }, (_, i) => <button type="button" className="earned-count-option" aria-pressed={memberCount === i} onClick={() => setMemberCount(i)} key={i}>
+                        <SelectionMark selected={memberCount === i} />
+                        <span>{i === 0 ? '없음' : `${i}명`}</span>
+                    </button>)}
+                </div>
+                <p className="earned-income-hint"><CalculationIcon name="people" />{memberCount === 0 ? '근로·사업소득 없이 소득 정보 입력으로 이동합니다.' : `선택한 ${memberCount}명의 나이를 다음 화면에서 확인합니다.`}</p>
+            </> : <>
+                <div className="earned-income-field-heading"><h3>소득이 있는 가구원 {memberCount}명</h3><span>{ages.filter(Boolean).length} / {memberCount}명 선택</span></div>
+                <div className="earned-age-members">
+                    {ages.map((age, index) => <fieldset className={`earned-age-member${alertMessage && !age ? ' needs-selection' : ''}`} key={index}>
+                        <legend><span>{index + 1}</span>가구원 {index + 1}</legend>
+                        <div className="earned-age-options">
+                            {ageOptions.map(option => <button type="button" className="earned-age-option" aria-pressed={age === option.value} onClick={() => {
+                                setAges(previous => previous.map((value, i) => i === index ? option.value : value));
+                                setAlertMessage(null);
+                            }} key={option.value}>{option.label}</button>)}
+                        </div>
+                    </fieldset>)}
+                </div>
+                {alertMessage && <p className="earned-income-error" role="alert">{alertMessage}</p>}
+            </>}
         </div>
-    );
+        <footer className="earned-income-footer">
+            <button type="button" className="earned-income-secondary" onClick={step === 1 ? onClose : () => { setStep(1); setAlertMessage(null); }}>{step === 1 ? '취소' : '이전'}</button>
+            <button type="button" className="earned-income-primary" onClick={step === 1 ? handleCountSubmit : handleAgeSubmit}>{step === 1 ? '다음' : '완료'}<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></button>
+        </footer>
+    </dialog>;
 }

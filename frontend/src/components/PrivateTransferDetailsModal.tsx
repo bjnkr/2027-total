@@ -1,5 +1,5 @@
 import type { UnifiedFormState } from '../types';
-import { MEDIAN_INCOME } from '../App';
+import { MEDIAN_INCOME } from '../data/benefitStandards';
 import { parseFormattedNumber } from '../utils';
 
 interface Props {
@@ -55,7 +55,7 @@ export default function PrivateTransferDetailsModal({ formData, onClose }: Props
     }
 
     const isFrequent = formData.isFrequentPrivateTransfer || validCount >= 6;
-    let finalAmount = 0;
+    let finalAmount: number;
     if (isSame) {
         finalAmount = totalDeductedSum;
     } else {

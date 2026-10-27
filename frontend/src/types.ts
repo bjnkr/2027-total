@@ -186,6 +186,7 @@ export interface CalculationResults {
             thresholdEducation?: number;
             livelihoodBenefitAmount?: number;
             housingBenefitAmount?: number;
+            standardRentByRegion?: Record<string, number>;
             details?: CalculationDetails;
         };
         hanbumo: {

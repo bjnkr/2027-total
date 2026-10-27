@@ -1,0 +1,28 @@
+.private-transfer-input-dialog.modal-content { width: min(640px, calc(100vw - 32px)); }
+.private-transfer-input-dialog.modal-content[open] { display: block; overflow-y: auto; overscroll-behavior: contain; }
+.private-transfer-input-dialog .private-transfer-input-body { overflow: visible; }
+.private-transfer-input-body { gap: 16px; container-type: inline-size; }
+.private-transfer-frequency { padding: 12px; border: 1px solid #dce6f0; border-radius: 9px; background: #f5f9fd; }
+.private-transfer-frequency-choice { display: flex; align-items: center; gap: 9px; color: #345675; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+.private-transfer-frequency-choice input { flex-shrink: 0; width: 18px; height: 18px; accent-color: var(--primary-color); }
+.private-transfer-frequency p { margin: 8px 0 0; color: #71859a; font-size: 0.77rem; line-height: 1.65; }
+.private-transfer-month-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; }
+.private-transfer-month-heading strong { color: #345675; font-size: 0.9rem; }
+.private-transfer-month-heading span { color: #71859a; font-size: 0.75rem; }
+.private-transfer-month-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 16px 12px; }
+.private-transfer-month-grid .form-group, .private-transfer-month-grid .input-wrapper { min-width: 0; }
+.private-transfer-month-grid .form-group > label { font-size: 0.85rem; margin-bottom: 4px; }
+.private-transfer-input-dialog .private-transfer-month-grid .form-group input { min-width: 0; padding: 10px 46px 10px 10px; font-size: 1rem; font-variant-numeric: tabular-nums; }
+.private-transfer-input-dialog .private-transfer-month-grid .unit-toggle { right: 6px; padding-inline: 4px; font-size: 0.85rem; }
+.private-transfer-draft-total { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 12px; border-radius: 8px; background: #edf6ff; color: #345675; font-size: 0.85rem; }
+.private-transfer-draft-total strong { color: var(--primary-color); font-variant-numeric: tabular-nums; }
+.private-transfer-entry-card { margin-top: 18px; }
+.private-transfer-entry-card .private-transfer-summary-type { grid-column: 1 / -1; }
+@container (width < 370px) {
+    .private-transfer-month-grid .form-group { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 8px; }
+    .private-transfer-input-body .private-transfer-month-grid .form-group > label { margin: 0; white-space: nowrap; }
+}
+@media (max-width: 767px) {
+    .private-transfer-input-dialog.modal-content { width: calc(100vw - 24px); }
+    .private-transfer-month-grid { gap: 14px 10px; }
+}

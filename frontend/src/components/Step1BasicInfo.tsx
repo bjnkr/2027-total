@@ -1,3 +1,4 @@
+import HelpButton from './HelpButton';
 import React from 'react';
 import type { UnifiedFormState } from '../types';
 
@@ -26,11 +27,11 @@ export default function Step1BasicInfo({ formData, setFormData, openHelpPanel }:
                 <div className="step-header">
                     <h2 className="step-section-title" style={{ display: 'flex', alignItems: 'center' }}>
                         1. 기본정보
-                        <button type="button" className="help-btn" onClick={() => openHelpPanel && openHelpPanel('basic_info')} aria-label="도움말">?</button>
+                        <HelpButton label="입력 도움말" subject="기본정보" onClick={() => openHelpPanel?.('basic_info')} />
                     </h2>
                 </div>
                 <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: '1.5rem' }}></div>
-                <div className="form-grid">
+                <div className="form-grid basic-info-grid">
                     <div className="form-group">
                         <label htmlFor="householdSize" className="flex-label">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="label-icon">
@@ -54,9 +55,42 @@ export default function Step1BasicInfo({ formData, setFormData, openHelpPanel }:
                             <option value="10">10인 가구</option>
                         </select>
                     </div>
+                    {/* 통합 폼 추가 필드: 재산특례여부 */}
+                    <div className="form-group basic-info-property">
+                        <label className="flex-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="label-icon">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                            재산특례여부
+                        </label>
+                        <div className="radio-group-box">
+                            <div className="radio-option">
+                                <input
+                                    type="radio"
+                                    id="propertyExceptionYes"
+                                    name="hasPropertyException"
+                                    checked={formData.hasPropertyException === true}
+                                    onChange={() => setFormData(prev => ({ ...prev, hasPropertyException: true }))}
+                                />
+                                <label htmlFor="propertyExceptionYes">예</label>
+                            </div>
+                            <div className="radio-option">
+                                <input
+                                    type="radio"
+                                    id="propertyExceptionNo"
+                                    name="hasPropertyException"
+                                    checked={formData.hasPropertyException === false}
+                                    onChange={() => setFormData(prev => ({ ...prev, hasPropertyException: false }))}
+                                />
+                                <label htmlFor="propertyExceptionNo">아니오</label>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* 통합 폼 추가 필드: 한부모 가족 여부 */}
                     {formData.householdSize !== '1' && (
-                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <div className="form-group basic-info-single-parent" style={{ gridColumn: '1 / -1' }}>
                         <label className="flex-label">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="label-icon">
                                 <circle cx="12" cy="12" r="10"></circle>
@@ -89,39 +123,6 @@ export default function Step1BasicInfo({ formData, setFormData, openHelpPanel }:
                         </div>
                     </div>
                     )}
-
-                    {/* 통합 폼 추가 필드: 재산특례여부 */}
-                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                        <label className="flex-label">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="label-icon">
-                                <path d="M12 20h9"></path>
-                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                            </svg>
-                            재산특례여부
-                        </label>
-                        <div className="radio-group-box" style={{ marginTop: '0.5rem' }}>
-                            <div className="radio-option">
-                                <input
-                                    type="radio"
-                                    id="propertyExceptionYes"
-                                    name="hasPropertyException"
-                                    checked={formData.hasPropertyException === true}
-                                    onChange={() => setFormData(prev => ({ ...prev, hasPropertyException: true }))}
-                                />
-                                <label htmlFor="propertyExceptionYes">예</label>
-                            </div>
-                            <div className="radio-option">
-                                <input
-                                    type="radio"
-                                    id="propertyExceptionNo"
-                                    name="hasPropertyException"
-                                    checked={formData.hasPropertyException === false}
-                                    onChange={() => setFormData(prev => ({ ...prev, hasPropertyException: false }))}
-                                />
-                                <label htmlFor="propertyExceptionNo">아니오</label>
-                            </div>
-                        </div>
-                    </div>
 
                 </div>
             </div>

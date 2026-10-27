@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { RESULT_HELP_RESOURCES, type ResultHelpResource } from '../data/resultHelpResources';
 
-function ResourceModal({ resource, onClose }: { resource: ResultHelpResource; onClose: () => void }) {
+export function ResourceModal({ resource, onClose }: { resource: ResultHelpResource; onClose: () => void }) {
     const dialogRef = useRef<HTMLDialogElement>(null);
     const [imageFailed, setImageFailed] = useState(false);
     const [imageRatio, setImageRatio] = useState<number | null>(null);
 
     useEffect(() => {
         const dialog = dialogRef.current;
+        const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         dialog?.showModal();
         const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
         return () => {
             dialog?.close();
             document.body.style.overflow = previousOverflow;
+            previousFocus?.focus({ preventScroll: true });
         };
     }, []);
 
